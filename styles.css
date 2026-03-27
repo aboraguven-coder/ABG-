@@ -537,6 +537,12 @@ img { max-width: 100%; display: block; }
   position: relative;
   overflow: hidden;
 }
+.product-image img {
+  transition: transform 0.4s ease;
+}
+.product-card:hover .product-image img {
+  transform: scale(1.05);
+}
 .product-image::before {
   content: '';
   position: absolute;
@@ -685,6 +691,14 @@ img { max-width: 100%; display: block; }
   justify-content: center;
   font-size: 3.5rem;
   background: var(--bg3);
+  overflow: hidden;
+  position: relative;
+}
+.deal-image img {
+  transition: transform 0.4s ease;
+}
+.deal-card:hover .deal-image img {
+  transform: scale(1.05);
 }
 
 .deal-info { padding: 20px; }

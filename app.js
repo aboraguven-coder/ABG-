@@ -1,32 +1,47 @@
 // =====================
+// NOTIFICATION CONFIG
+// To receive email alerts when someone orders:
+// 1. Go to https://emailjs.com and create a FREE account
+// 2. Create an Email Service (Gmail works great)
+// 3. Create an Email Template with variables: {{order_items}}, {{order_total}}, {{customer_email}}
+// 4. Replace the values below with your own IDs
+// =====================
+const EMAILJS_CONFIG = {
+  publicKey:   'YOUR_PUBLIC_KEY',    // From EmailJS > Account > API Keys
+  serviceId:   'YOUR_SERVICE_ID',    // From EmailJS > Email Services
+  templateId:  'YOUR_TEMPLATE_ID',   // From EmailJS > Email Templates
+  ownerEmail:  'your@email.com',     // Your email — where notifications go
+};
+
+// =====================
 // PRODUCT DATA
 // =====================
 const products = [
-  { id: 1, name: "Smart LED Desk Lamp", category: "Tech", price: 34.99, original: 59.99, emoji: "💡", rating: 4.8, reviews: 1243, badge: "hot", tags: ["popular"] },
-  { id: 2, name: "Wireless Noise-Cancelling Earbuds", category: "Tech", price: 49.99, original: 89.99, emoji: "🎧", rating: 4.9, reviews: 3210, badge: "best", tags: ["popular"] },
-  { id: 3, name: "Portable Phone Charger 20000mAh", category: "Tech", price: 29.99, original: 49.99, emoji: "🔋", rating: 4.7, reviews: 892, badge: "sale", tags: [] },
-  { id: 4, name: "Magnetic Phone Mount", category: "Tech", price: 14.99, original: null, emoji: "📱", rating: 4.6, reviews: 567, badge: "new", tags: [] },
-  { id: 5, name: "Smart Watch Fitness Tracker", category: "Tech", price: 59.99, original: 99.99, emoji: "⌚", rating: 4.8, reviews: 2100, badge: "hot", tags: ["popular"] },
-  { id: 6, name: "Artisan Scented Candle Set", category: "Home", price: 24.99, original: 39.99, emoji: "🕯️", rating: 4.9, reviews: 788, badge: "new", tags: [] },
-  { id: 7, name: "Minimalist Wall Clock", category: "Home", price: 32.99, original: null, emoji: "🕐", rating: 4.7, reviews: 312, badge: null, tags: [] },
-  { id: 8, name: "Premium Silk Pillowcase Set", category: "Home", price: 27.99, original: 44.99, emoji: "🛏️", rating: 4.8, reviews: 1045, badge: "sale", tags: [] },
-  { id: 9, name: "Compact Air Purifier", category: "Home", price: 44.99, original: 74.99, emoji: "🌿", rating: 4.7, reviews: 654, badge: "hot", tags: ["popular"] },
-  { id: 10, name: "Oversized Knit Sweater", category: "Fashion", price: 38.99, original: 64.99, emoji: "🧥", rating: 4.6, reviews: 923, badge: "new", tags: [] },
-  { id: 11, name: "Leather Minimalist Wallet", category: "Fashion", price: 22.99, original: null, emoji: "👛", rating: 4.8, reviews: 1560, badge: "best", tags: ["popular"] },
-  { id: 12, name: "Sunglasses UV400 Polarized", category: "Fashion", price: 19.99, original: 34.99, emoji: "🕶️", rating: 4.5, reviews: 743, badge: "sale", tags: [] },
-  { id: 13, name: "Jade Facial Roller Set", category: "Beauty", price: 16.99, original: 29.99, emoji: "💎", rating: 4.9, reviews: 2340, badge: "hot", tags: ["popular"] },
-  { id: 14, name: "Vitamin C Glow Serum", category: "Beauty", price: 21.99, original: 38.99, emoji: "✨", rating: 4.8, reviews: 1876, badge: "best", tags: [] },
-  { id: 15, name: "Resistance Band Set", category: "Sports", price: 18.99, original: 29.99, emoji: "🏋️", rating: 4.7, reviews: 1120, badge: "new", tags: [] },
-  { id: 16, name: "Yoga Mat Premium Non-Slip", category: "Sports", price: 31.99, original: 54.99, emoji: "🧘", rating: 4.9, reviews: 987, badge: "sale", tags: [] },
-  { id: 17, name: "Interactive Pet Feeder", category: "Pets", price: 26.99, original: 44.99, emoji: "🐾", rating: 4.8, reviews: 678, badge: "new", tags: [] },
-  { id: 18, name: "Pet Grooming Glove", category: "Pets", price: 12.99, original: null, emoji: "🐶", rating: 4.7, reviews: 1234, badge: null, tags: [] },
+  { id: 1,  name: "Smart LED Desk Lamp",             category: "Tech",    price: 34.99, original: 59.99, emoji: "💡", image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=400&q=80", rating: 4.8, reviews: 1243, badge: "hot",  tags: ["popular"] },
+  { id: 2,  name: "Wireless Noise-Cancelling Earbuds",category: "Tech",   price: 49.99, original: 89.99, emoji: "🎧", image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80", rating: 4.9, reviews: 3210, badge: "best", tags: ["popular"] },
+  { id: 3,  name: "Portable Phone Charger 20000mAh", category: "Tech",    price: 29.99, original: 49.99, emoji: "🔋", image: "https://images.unsplash.com/photo-1585338447937-7082f8fc763d?auto=format&fit=crop&w=400&q=80", rating: 4.7, reviews: 892,  badge: "sale", tags: [] },
+  { id: 4,  name: "Magnetic Phone Mount",            category: "Tech",    price: 14.99, original: null,  emoji: "📱", image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=400&q=80", rating: 4.6, reviews: 567,  badge: "new",  tags: [] },
+  { id: 5,  name: "Smart Watch Fitness Tracker",     category: "Tech",    price: 59.99, original: 99.99, emoji: "⌚", image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80", rating: 4.8, reviews: 2100, badge: "hot",  tags: ["popular"] },
+  { id: 6,  name: "Artisan Scented Candle Set",      category: "Home",    price: 24.99, original: 39.99, emoji: "🕯️", image: "https://images.unsplash.com/photo-1602607514358-62f3f1bd9e73?auto=format&fit=crop&w=400&q=80", rating: 4.9, reviews: 788,  badge: "new",  tags: [] },
+  { id: 7,  name: "Minimalist Wall Clock",           category: "Home",    price: 32.99, original: null,  emoji: "🕐", image: "https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?auto=format&fit=crop&w=400&q=80", rating: 4.7, reviews: 312,  badge: null,   tags: [] },
+  { id: 8,  name: "Premium Silk Pillowcase Set",     category: "Home",    price: 27.99, original: 44.99, emoji: "🛏️", image: "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=400&q=80", rating: 4.8, reviews: 1045, badge: "sale", tags: [] },
+  { id: 9,  name: "Compact Air Purifier",            category: "Home",    price: 44.99, original: 74.99, emoji: "🌿", image: "https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=400&q=80", rating: 4.7, reviews: 654,  badge: "hot",  tags: ["popular"] },
+  { id: 10, name: "Oversized Knit Sweater",          category: "Fashion", price: 38.99, original: 64.99, emoji: "🧥", image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=400&q=80", rating: 4.6, reviews: 923,  badge: "new",  tags: [] },
+  { id: 11, name: "Leather Minimalist Wallet",       category: "Fashion", price: 22.99, original: null,  emoji: "👛", image: "https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&w=400&q=80", rating: 4.8, reviews: 1560, badge: "best", tags: ["popular"] },
+  { id: 12, name: "Sunglasses UV400 Polarized",      category: "Fashion", price: 19.99, original: 34.99, emoji: "🕶️", image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&w=400&q=80", rating: 4.5, reviews: 743,  badge: "sale", tags: [] },
+  { id: 13, name: "Jade Facial Roller Set",          category: "Beauty",  price: 16.99, original: 29.99, emoji: "💎", image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=400&q=80", rating: 4.9, reviews: 2340, badge: "hot",  tags: ["popular"] },
+  { id: 14, name: "Vitamin C Glow Serum",            category: "Beauty",  price: 21.99, original: 38.99, emoji: "✨", image: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=400&q=80", rating: 4.8, reviews: 1876, badge: "best", tags: [] },
+  { id: 15, name: "Resistance Band Set",             category: "Sports",  price: 18.99, original: 29.99, emoji: "🏋️", image: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=400&q=80", rating: 4.7, reviews: 1120, badge: "new",  tags: [] },
+  { id: 16, name: "Yoga Mat Premium Non-Slip",       category: "Sports",  price: 31.99, original: 54.99, emoji: "🧘", image: "https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=400&q=80", rating: 4.9, reviews: 987,  badge: "sale", tags: [] },
+  { id: 17, name: "Interactive Pet Feeder",          category: "Pets",    price: 26.99, original: 44.99, emoji: "🐾", image: "https://images.unsplash.com/photo-1601758124510-52d02ddb7cbd?auto=format&fit=crop&w=400&q=80", rating: 4.8, reviews: 678,  badge: "new",  tags: [] },
+  { id: 18, name: "Pet Grooming Glove",              category: "Pets",    price: 12.99, original: null,  emoji: "🐶", image: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?auto=format&fit=crop&w=400&q=80", rating: 4.7, reviews: 1234, badge: null,   tags: [] },
 ];
 
 const deals = [
-  { id: 101, name: "Smart LED Strip Lights (5m)", price: 18.99, original: 49.99, pct: 62, emoji: "🌈", sold: 78, total: 100 },
-  { id: 102, name: "Bluetooth 5.0 Mini Speaker", price: 22.99, original: 59.99, pct: 62, emoji: "🔊", sold: 65, total: 80 },
-  { id: 103, name: "Electric Posture Corrector", price: 29.99, original: 79.99, pct: 63, emoji: "🦺", sold: 42, total: 60 },
-  { id: 104, name: "Anti-Gravity Phone Case", price: 14.99, original: 39.99, pct: 63, emoji: "📲", sold: 91, total: 100 },
+  { id: 101, name: "Smart LED Strip Lights (5m)",  price: 18.99, original: 49.99, pct: 62, emoji: "🌈", image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=400&q=80", sold: 78, total: 100 },
+  { id: 102, name: "Bluetooth 5.0 Mini Speaker",   price: 22.99, original: 59.99, pct: 62, emoji: "🔊", image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=400&q=80", sold: 65, total: 80 },
+  { id: 103, name: "Electric Posture Corrector",   price: 29.99, original: 79.99, pct: 63, emoji: "🦺", image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=400&q=80", sold: 42, total: 60 },
+  { id: 104, name: "Anti-Gravity Phone Case",      price: 14.99, original: 39.99, pct: 63, emoji: "📲", image: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?auto=format&fit=crop&w=400&q=80", sold: 91, total: 100 },
 ];
 
 // =====================
@@ -76,10 +91,13 @@ function renderProducts() {
 
   grid.innerHTML = filtered.map(p => `
     <div class="product-card" data-id="${p.id}">
-      <div class="product-image">
+      <div class="product-image" style="padding:0;overflow:hidden;">
         ${p.badge ? `<span class="product-badge badge-${p.badge}">${badgeLabel(p.badge)}</span>` : ''}
         <button class="wishlist-btn" onclick="wishlist(event, ${p.id})">♡</button>
-        <span style="font-size:4rem;position:relative">${p.emoji}</span>
+        <img src="${p.image}" alt="${p.name}"
+          style="width:100%;height:100%;object-fit:cover;display:block;"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+        <span style="font-size:4rem;position:absolute;inset:0;display:none;align-items:center;justify-content:center;">${p.emoji}</span>
       </div>
       <div class="product-info">
         <div class="product-category">${p.category}</div>
@@ -122,7 +140,12 @@ function renderDeals() {
         <span class="deal-tag">🔥 FLASH DEAL</span>
         <span class="deal-countdown" id="countdown-${d.id}">Loading...</span>
       </div>
-      <div class="deal-image">${d.emoji}</div>
+      <div class="deal-image" style="padding:0;overflow:hidden;">
+        <img src="${d.image}" alt="${d.name}"
+          style="width:100%;height:100%;object-fit:cover;display:block;"
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+        <span style="font-size:3.5rem;width:100%;height:100%;display:none;align-items:center;justify-content:center;">${d.emoji}</span>
+      </div>
       <div class="deal-info">
         <div class="deal-name">${d.name}</div>
         <div class="deal-prices">
@@ -331,18 +354,56 @@ function showToast(message) {
 }
 
 // =====================
-// CHECKOUT
+// CHECKOUT + EMAIL NOTIFICATION
 // =====================
 function handleCheckout() {
   if (cart.length === 0) return;
-  showToast('🚀 Redirecting to checkout...');
+
+  // Ask for customer email so you know who ordered
+  const customerEmail = prompt('Please enter your email address to complete the order:');
+  if (!customerEmail || !customerEmail.includes('@')) {
+    showToast('❌ Please enter a valid email.');
+    return;
+  }
+
+  showToast('🚀 Processing your order...');
+
+  const orderTotal = cart.reduce((s, i) => s + i.price * i.qty, 0).toFixed(2);
+  const orderItems = cart.map(i => `${i.name} x${i.qty} — $${(i.price * i.qty).toFixed(2)}`).join('\n');
+
+  // Send email notification to store owner via EmailJS
+  sendOrderNotification(customerEmail, orderItems, orderTotal);
+
   setTimeout(() => {
-    alert('Thank you for shopping at NovaDrop!\n\nIn a live store, this would redirect to your payment processor.\n\nOrder total: $' + cart.reduce((s, i) => s + i.price * i.qty, 0).toFixed(2));
+    alert(`✅ Order placed! Thank you!\n\nWe'll send your confirmation to: ${customerEmail}\n\nOrder Summary:\n${orderItems}\n\nTotal: $${orderTotal}`);
     cart = [];
     saveCart();
     updateCartUI();
     toggleCart();
-  }, 1500);
+  }, 1000);
+}
+
+function sendOrderNotification(customerEmail, orderItems, orderTotal) {
+  // Only runs if EmailJS is configured
+  if (EMAILJS_CONFIG.publicKey === 'YOUR_PUBLIC_KEY') return;
+
+  if (typeof emailjs === 'undefined') {
+    console.warn('EmailJS not loaded');
+    return;
+  }
+
+  emailjs.init(EMAILJS_CONFIG.publicKey);
+  emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+    to_email:       EMAILJS_CONFIG.ownerEmail,
+    customer_email: customerEmail,
+    order_items:    orderItems,
+    order_total:    '$' + orderTotal,
+    order_date:     new Date().toLocaleString(),
+  }).then(() => {
+    console.log('Order notification sent!');
+  }).catch(err => {
+    console.error('EmailJS error:', err);
+  });
 }
 
 // =====================
