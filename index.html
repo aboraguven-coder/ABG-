@@ -3,85 +3,124 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>BlockDrop - Puzzle Game</title>
-  <meta name="description" content="A relaxing block puzzle game. No timer, no pressure. Play anytime, anywhere — no internet needed." />
+  <title>ShadowKeep</title>
+  <meta name="description" content="A turn-based dungeon crawler. Explore, fight, collect — no timer, no internet. Play anytime." />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#0f1221" />
+  <meta name="theme-color" content="#0a0c14" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div id="app">
-    <!-- START SCREEN -->
-    <div class="screen active" id="startScreen">
-      <div class="start-bg">
-        <div class="float-block fb1"></div>
-        <div class="float-block fb2"></div>
-        <div class="float-block fb3"></div>
-        <div class="float-block fb4"></div>
+
+    <!-- TITLE SCREEN -->
+    <div class="screen active" id="titleScreen">
+      <div class="title-bg">
+        <div class="torch torch-l"></div>
+        <div class="torch torch-r"></div>
       </div>
-      <div class="start-content">
-        <h1 class="game-title">BLOCK<span>DROP</span></h1>
-        <p class="game-subtitle">No timer. No pressure. Just puzzles.</p>
-        <div class="start-buttons">
-          <button class="btn btn-primary" id="btnPlay">Play</button>
+      <div class="title-content">
+        <div class="title-icon">&#9876;</div>
+        <h1 class="title-name">SHADOW<span>KEEP</span></h1>
+        <p class="title-sub">Descend. Fight. Survive.</p>
+        <div class="title-buttons">
+          <button class="btn btn-primary" id="btnNewGame">New Game</button>
           <button class="btn btn-secondary" id="btnContinue" style="display:none">Continue</button>
         </div>
-        <div class="start-highscore" id="startHighscore"></div>
+        <div class="title-stats" id="titleStats"></div>
+        <div class="title-how">
+          <button class="btn btn-ghost" id="btnHowTo">How to Play</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOW TO PLAY -->
+    <div class="screen" id="howScreen">
+      <div class="how-content">
+        <h2>How to Play</h2>
+        <div class="how-list">
+          <div class="how-item"><span class="how-icon">&#128694;</span><div><strong>Move</strong><br>Tap/swipe on the map or use the D-pad to move. Enemies move when you move.</div></div>
+          <div class="how-item"><span class="how-icon">&#9876;</span><div><strong>Fight</strong><br>Walk into an enemy to attack it. Each enemy has HP shown above it.</div></div>
+          <div class="how-item"><span class="how-icon">&#127860;</span><div><strong>Items</strong><br>Walk over potions to heal and gold to increase your score.</div></div>
+          <div class="how-item"><span class="how-icon">&#128682;</span><div><strong>Descend</strong><br>Find the stairs on each floor to go deeper. Enemies get tougher.</div></div>
+          <div class="how-item"><span class="how-icon">&#128190;</span><div><strong>Save</strong><br>Your game is saved every move. Close and come back anytime.</div></div>
+        </div>
+        <button class="btn btn-primary" id="btnBackHow">Got it</button>
       </div>
     </div>
 
     <!-- GAME SCREEN -->
     <div class="screen" id="gameScreen">
-      <div class="game-header">
-        <button class="icon-btn" id="btnPause" title="Pause">II</button>
-        <div class="score-display">
-          <div class="score-label">Score</div>
-          <div class="score-value" id="scoreValue">0</div>
+      <div class="game-top">
+        <button class="icon-btn" id="btnMenu">&#9776;</button>
+        <div class="stat-bar">
+          <div class="stat-item hp-stat">
+            <span class="stat-icon">&#10084;</span>
+            <div class="hp-bar-wrap">
+              <div class="hp-bar-fill" id="hpBar"></div>
+            </div>
+            <span class="stat-text" id="hpText">20/20</span>
+          </div>
         </div>
-        <div class="best-display">
-          <div class="score-label">Best</div>
-          <div class="score-value" id="bestValue">0</div>
+        <div class="stat-row">
+          <div class="stat-pill"><span>&#9876;</span> <span id="atkText">3</span></div>
+          <div class="stat-pill"><span>&#128176;</span> <span id="goldText">0</span></div>
+          <div class="stat-pill"><span>&#128682;</span> <span id="floorText">F1</span></div>
         </div>
       </div>
 
-      <div class="board-container">
-        <canvas id="gameCanvas"></canvas>
-        <div class="combo-popup" id="comboPopup"></div>
+      <div class="map-container" id="mapContainer">
+        <canvas id="mapCanvas"></canvas>
       </div>
 
-      <div class="pieces-tray" id="piecesTray"></div>
+      <div class="game-log" id="gameLog">
+        <div class="log-text" id="logText">Welcome to ShadowKeep...</div>
+      </div>
+
+      <div class="dpad">
+        <button class="dpad-btn dpad-up" data-dir="up">&#9650;</button>
+        <button class="dpad-btn dpad-left" data-dir="left">&#9664;</button>
+        <button class="dpad-btn dpad-center" data-dir="wait">&#8226;</button>
+        <button class="dpad-btn dpad-right" data-dir="right">&#9654;</button>
+        <button class="dpad-btn dpad-down" data-dir="down">&#9660;</button>
+      </div>
     </div>
 
-    <!-- PAUSE OVERLAY -->
-    <div class="overlay" id="pauseOverlay">
+    <!-- MENU OVERLAY -->
+    <div class="overlay" id="menuOverlay">
       <div class="modal">
         <h2>Paused</h2>
+        <div class="pause-stats">
+          <div>Floor: <strong id="pauseFloor">1</strong></div>
+          <div>Gold: <strong id="pauseGold">0</strong></div>
+        </div>
         <div class="modal-buttons">
           <button class="btn btn-primary" id="btnResume">Resume</button>
-          <button class="btn btn-secondary" id="btnRestartPause">Restart</button>
-          <button class="btn btn-ghost" id="btnHomePause">Home</button>
+          <button class="btn btn-secondary" id="btnRestart">New Game</button>
+          <button class="btn btn-ghost" id="btnHomeMenu">Home</button>
         </div>
       </div>
     </div>
 
-    <!-- GAME OVER OVERLAY -->
-    <div class="overlay" id="gameOverOverlay">
-      <div class="modal">
-        <h2>Game Over</h2>
-        <div class="final-score">
-          <div class="final-label">Score</div>
-          <div class="final-value" id="finalScore">0</div>
+    <!-- DEATH OVERLAY -->
+    <div class="overlay" id="deathOverlay">
+      <div class="modal death-modal">
+        <div class="death-icon">&#9760;</div>
+        <h2>You Died</h2>
+        <div class="death-stats">
+          <div class="death-stat"><span>Floor Reached</span><strong id="deathFloor">1</strong></div>
+          <div class="death-stat"><span>Gold Collected</span><strong id="deathGold">0</strong></div>
+          <div class="death-stat"><span>Enemies Slain</span><strong id="deathKills">0</strong></div>
         </div>
-        <div class="final-best" id="finalBest"></div>
+        <div class="death-record" id="deathRecord"></div>
         <div class="modal-buttons">
-          <button class="btn btn-primary" id="btnRestartOver">Play Again</button>
-          <button class="btn btn-ghost" id="btnHomeOver">Home</button>
+          <button class="btn btn-primary" id="btnRetry">Try Again</button>
+          <button class="btn btn-ghost" id="btnHomeDeath">Home</button>
         </div>
       </div>
     </div>
-  </div>
 
+  </div>
   <script src="app.js"></script>
 </body>
 </html>
