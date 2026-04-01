@@ -1,0 +1,25 @@
+{
+  "name": "NumDrop",
+  "short_name": "NumDrop",
+  "description": "Place numbered shapes, merge matching numbers, clear lines. No timer, no internet needed.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1119",
+  "theme_color": "#0f1119",
+  "categories": ["games", "puzzle"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

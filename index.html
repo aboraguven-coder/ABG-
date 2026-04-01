@@ -2,12 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>NumDrop</title>
   <meta name="description" content="Place numbered shapes, merge matching numbers, clear lines. A relaxing puzzle — no timer, no internet needed." />
+
+  <!-- PWA / Mobile -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NumDrop" />
   <meta name="theme-color" content="#0f1119" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -55,6 +62,7 @@
       </div>
 
       <div class="popup" id="popup"></div>
+      <div class="score-pop" id="scorePop"></div>
 
       <div class="tray" id="tray"></div>
     </div>
@@ -87,6 +95,9 @@
         </div>
       </div>
     </div>
+
+    <!-- DRAG GHOST (floating piece follows finger) -->
+    <div class="drag-ghost" id="dragGhost"></div>
 
   </div>
   <script src="app.js"></script>

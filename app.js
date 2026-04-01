@@ -1,6 +1,6 @@
 // =============================================
 // NumDrop — Number Merge + Block Blast Puzzle
-// No timer, offline, auto-save every move
+// Mobile game: drag & drop, haptics, PWA offline
 // =============================================
 
 (() => {
@@ -13,7 +13,7 @@
   const SAVE_KEY = 'numdrop_save';
   const BEST_KEY = 'numdrop_best';
 
-  // Number → color mapping (2048-inspired, dark-theme adjusted)
+  // Number → color mapping (2048-inspired, vibrant on dark)
   const NUM_COLORS = {
     2:    { bg: '#4a4458', fg: '#e8e4f0' },
     4:    { bg: '#5b4e6e', fg: '#f0ecf5' },
@@ -29,72 +29,48 @@
     4096: { bg: '#a040e0', fg: '#fff' },
     8192: { bg: '#6020c0', fg: '#fff' },
   };
-
   function getNumColor(n) {
-    if (NUM_COLORS[n]) return NUM_COLORS[n];
-    return { bg: '#4020a0', fg: '#fff' };
+    return NUM_COLORS[n] || { bg: '#4020a0', fg: '#fff' };
   }
 
-  // Block shapes (same as Block Blast style)
+  // Block shapes (Block Blast style)
   const SHAPES = [
-    // 1-cell
     [[1]],
-    // 2-cell
-    [[1, 1]],
-    [[1], [1]],
-    // 3-cell lines
-    [[1, 1, 1]],
-    [[1], [1], [1]],
-    // L-shapes (3-cell)
-    [[1, 1], [1, 0]],
-    [[1, 1], [0, 1]],
-    [[1, 0], [1, 1]],
-    [[0, 1], [1, 1]],
-    // 4-cell lines
-    [[1, 1, 1, 1]],
-    [[1], [1], [1], [1]],
-    // 4-cell square
-    [[1, 1], [1, 1]],
-    // T-shapes
-    [[1, 1, 1], [0, 1, 0]],
-    [[0, 1, 0], [1, 1, 1]],
-    [[1, 0], [1, 1], [1, 0]],
-    [[0, 1], [1, 1], [0, 1]],
-    // S/Z shapes
-    [[1, 1, 0], [0, 1, 1]],
-    [[0, 1, 1], [1, 1, 0]],
-    // L-shapes (4-cell)
-    [[1, 0], [1, 0], [1, 1]],
-    [[0, 1], [0, 1], [1, 1]],
-    [[1, 1], [1, 0], [1, 0]],
-    [[1, 1], [0, 1], [0, 1]],
-    // 5-cell line
-    [[1, 1, 1, 1, 1]],
-    [[1], [1], [1], [1], [1]],
-    // 2x3 / 3x2
-    [[1, 1, 1], [1, 1, 1]],
-    [[1, 1], [1, 1], [1, 1]],
-    // 3x3
-    [[1, 1, 1], [1, 1, 1], [1, 1, 1]],
-    // Corner shapes
-    [[1, 1, 1], [1, 0, 0]],
-    [[1, 1, 1], [0, 0, 1]],
-    [[1, 0, 0], [1, 1, 1]],
-    [[0, 0, 1], [1, 1, 1]],
+    [[1,1]], [[1],[1]],
+    [[1,1,1]], [[1],[1],[1]],
+    [[1,1],[1,0]], [[1,1],[0,1]], [[1,0],[1,1]], [[0,1],[1,1]],
+    [[1,1,1,1]], [[1],[1],[1],[1]],
+    [[1,1],[1,1]],
+    [[1,1,1],[0,1,0]], [[0,1,0],[1,1,1]],
+    [[1,0],[1,1],[1,0]], [[0,1],[1,1],[0,1]],
+    [[1,1,0],[0,1,1]], [[0,1,1],[1,1,0]],
+    [[1,0],[1,0],[1,1]], [[0,1],[0,1],[1,1]],
+    [[1,1],[1,0],[1,0]], [[1,1],[0,1],[0,1]],
+    [[1,1,1,1,1]], [[1],[1],[1],[1],[1]],
+    [[1,1,1],[1,1,1]], [[1,1],[1,1],[1,1]],
+    [[1,1,1],[1,1,1],[1,1,1]],
+    [[1,1,1],[1,0,0]], [[1,1,1],[0,0,1]],
+    [[1,0,0],[1,1,1]], [[0,0,1],[1,1,1]],
   ];
 
   // =====================
   // STATE
   // =====================
-  let board = [];     // 8x8, each cell = 0 or a power-of-2 number
-  let pieces = [];    // current 3 pieces: { shape, nums (2D matching shape), used }
+  let board = [];
+  let pieces = [];
   let score = 0;
   let best = 0;
   let selectedPiece = -1;
   let hoverCell = null;
   let animating = false;
 
-  // Canvas refs
+  // Drag state
+  let dragging = false;
+  let dragIndex = -1;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  // Canvas
   let canvas, ctx;
   let cellSize = 0;
 
@@ -107,8 +83,10 @@
   const gameScreen   = $('gameScreen');
   const pauseOverlay = $('pauseOverlay');
   const overOverlay  = $('overOverlay');
-  const tray         = $('tray');
+  const trayEl       = $('tray');
   const popup        = $('popup');
+  const scorePop     = $('scorePop');
+  const dragGhost    = $('dragGhost');
 
   // =====================
   // INIT
@@ -116,7 +94,6 @@
   function init() {
     canvas = $('boardCanvas');
     ctx = canvas.getContext('2d');
-
     best = parseInt(localStorage.getItem(BEST_KEY)) || 0;
 
     // Buttons
@@ -129,10 +106,27 @@
     $('btnRetry').onclick = () => { overOverlay.classList.remove('active'); startNew(); };
     $('btnHomeO').onclick = () => { overOverlay.classList.remove('active'); goHome(); };
 
-    // Canvas pointer events
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerdown', onDown);
-    canvas.addEventListener('pointerleave', () => { hoverCell = null; draw(); });
+    // Global pointer events for drag
+    document.addEventListener('pointermove', onGlobalMove, { passive: false });
+    document.addEventListener('pointerup', onGlobalUp);
+    document.addEventListener('pointercancel', onGlobalUp);
+
+    // Also support tap-to-place on board (for accessibility)
+    canvas.addEventListener('pointerdown', onBoardTap);
+
+    // Prevent context menu on long press
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Prevent pinch zoom
+    document.addEventListener('gesturestart', e => e.preventDefault());
+    document.addEventListener('touchmove', e => {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
 
     updateTitleScreen();
   }
@@ -165,6 +159,8 @@
     selectedPiece = -1;
     hoverCell = null;
     animating = false;
+    dragging = false;
+    dragIndex = -1;
     pieces = genPieces();
 
     showScreen(gameScreen);
@@ -206,8 +202,6 @@
   }
 
   function genNums(shape) {
-    // Generate number for each filled cell
-    // Higher scores → occasionally higher starting numbers
     const tier = Math.min(3, Math.floor(score / 500));
     const pool = [2, 2, 2, 2, 4, 4];
     if (tier >= 1) pool.push(4, 4, 8);
@@ -249,8 +243,8 @@
   // DRAWING
   // =====================
   function draw() {
-    const size = cellSize * GRID;
-    ctx.clearRect(0, 0, size, size);
+    const total = cellSize * GRID;
+    ctx.clearRect(0, 0, total, total);
 
     const gap = 2;
     const radius = Math.max(3, cellSize * 0.12);
@@ -263,27 +257,23 @@
         const h = cellSize - gap * 2;
 
         if (board[r][c]) {
-          // Filled cell with number
           const nc = getNumColor(board[r][c]);
           roundRect(x, y, w, h, radius, nc.bg);
-
-          // Top shine
+          // Shine
           ctx.fillStyle = 'rgba(255,255,255,0.1)';
           ctx.fillRect(x + 2, y + 2, w - 4, Math.max(2, h * 0.12));
-
-          // Number text
           drawNum(board[r][c], x, y, w, h, nc.fg);
         } else {
-          // Empty cell
           const shade = (r + c) % 2 === 0 ? '#181b28' : '#1c1f2e';
           roundRect(x, y, w, h, radius, shade);
         }
       }
     }
 
-    // Draw hover preview
-    if (hoverCell && selectedPiece >= 0 && pieces[selectedPiece] && !pieces[selectedPiece].used) {
-      const piece = pieces[selectedPiece];
+    // Hover preview (from drag or selected piece)
+    const previewIdx = dragging ? dragIndex : selectedPiece;
+    if (hoverCell && previewIdx >= 0 && pieces[previewIdx] && !pieces[previewIdx].used) {
+      const piece = pieces[previewIdx];
       const valid = canPlace(piece, hoverCell.row, hoverCell.col);
 
       for (let r = 0; r < piece.shape.length; r++) {
@@ -300,12 +290,12 @@
 
           if (valid) {
             const nc = getNumColor(piece.nums[r][c]);
-            ctx.globalAlpha = 0.5;
+            ctx.globalAlpha = 0.55;
             roundRect(x, y, w, h, radius, nc.bg);
             drawNum(piece.nums[r][c], x, y, w, h, nc.fg);
             ctx.globalAlpha = 1;
           } else {
-            ctx.globalAlpha = 0.25;
+            ctx.globalAlpha = 0.2;
             roundRect(x, y, w, h, radius, '#ef4444');
             ctx.globalAlpha = 1;
           }
@@ -338,123 +328,205 @@
     else fontSize = cellSize * 0.26;
 
     ctx.fillStyle = color;
-    ctx.font = `800 ${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = `800 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(str, x + w / 2, y + h / 2 + 1);
   }
 
   // =====================
-  // TRAY
+  // TRAY (piece slots)
   // =====================
   function renderTray() {
-    tray.innerHTML = '';
+    trayEl.innerHTML = '';
 
     pieces.forEach((piece, idx) => {
       const slot = document.createElement('div');
-      slot.className = 'piece-slot' + (piece.used ? ' used' : '') + (idx === selectedPiece ? ' selected' : '');
+      slot.className = 'piece-slot'
+        + (piece.used ? ' used' : '')
+        + (idx === selectedPiece ? ' selected' : '')
+        + (dragging && idx === dragIndex ? ' dragging' : '');
 
-      const miniSize = Math.min(18, Math.floor(65 / Math.max(piece.shape.length, piece.shape[0].length)));
-      const pcW = piece.shape[0].length * miniSize;
-      const pcH = piece.shape.length * miniSize;
+      const miniSize = Math.min(22, Math.floor(75 / Math.max(piece.shape.length, piece.shape[0].length)));
+      const pcCanvas = createPieceCanvas(piece, miniSize);
 
-      const pc = document.createElement('canvas');
-      pc.className = 'piece-canvas';
-      pc.width = pcW * 2;
-      pc.height = pcH * 2;
-      pc.style.width = pcW + 'px';
-      pc.style.height = pcH + 'px';
+      slot.appendChild(pcCanvas);
 
-      const pctx = pc.getContext('2d');
-      pctx.setTransform(2, 0, 0, 2, 0, 0);
-
-      for (let r = 0; r < piece.shape.length; r++) {
-        for (let c = 0; c < piece.shape[r].length; c++) {
-          if (!piece.shape[r][c]) continue;
-          const num = piece.nums[r][c];
-          const nc = getNumColor(num);
-          const mg = 1;
-          const bx = c * miniSize + mg;
-          const by = r * miniSize + mg;
-          const bw = miniSize - mg * 2;
-          const bh = miniSize - mg * 2;
-
-          pctx.fillStyle = nc.bg;
-          pctx.beginPath();
-          const rr = 2;
-          pctx.moveTo(bx + rr, by);
-          pctx.lineTo(bx + bw - rr, by);
-          pctx.quadraticCurveTo(bx + bw, by, bx + bw, by + rr);
-          pctx.lineTo(bx + bw, by + bh - rr);
-          pctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - rr, by + bh);
-          pctx.lineTo(bx + rr, by + bh);
-          pctx.quadraticCurveTo(bx, by + bh, bx, by + bh - rr);
-          pctx.lineTo(bx, by + rr);
-          pctx.quadraticCurveTo(bx, by, bx + rr, by);
-          pctx.closePath();
-          pctx.fill();
-
-          // Mini number
-          const fs = miniSize * 0.45;
-          pctx.fillStyle = nc.fg;
-          pctx.font = `800 ${fs}px sans-serif`;
-          pctx.textAlign = 'center';
-          pctx.textBaseline = 'middle';
-          pctx.fillText(String(num), bx + bw / 2, by + bh / 2 + 0.5);
-        }
-      }
-
-      slot.appendChild(pc);
-      slot.addEventListener('pointerdown', () => {
+      // Start drag on pointerdown
+      slot.addEventListener('pointerdown', (e) => {
         if (piece.used || animating) return;
-        selectedPiece = selectedPiece === idx ? -1 : idx;
-        renderTray();
-        draw();
+        e.preventDefault();
+        startDrag(idx, e);
       });
 
-      tray.appendChild(slot);
+      trayEl.appendChild(slot);
     });
   }
 
-  // =====================
-  // INPUT
-  // =====================
-  function getCell(e) {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const col = Math.floor(x / cellSize);
-    const row = Math.floor(y / cellSize);
-    if (row < 0 || row >= GRID || col < 0 || col >= GRID) return null;
-    return { row, col };
+  function createPieceCanvas(piece, miniSize) {
+    const pcW = piece.shape[0].length * miniSize;
+    const pcH = piece.shape.length * miniSize;
+    const dpr = 2;
+
+    const pc = document.createElement('canvas');
+    pc.className = 'piece-canvas';
+    pc.width = pcW * dpr;
+    pc.height = pcH * dpr;
+    pc.style.width = pcW + 'px';
+    pc.style.height = pcH + 'px';
+
+    const pctx = pc.getContext('2d');
+    pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const mg = 1;
+    const rr = 2;
+
+    for (let r = 0; r < piece.shape.length; r++) {
+      for (let c = 0; c < piece.shape[r].length; c++) {
+        if (!piece.shape[r][c]) continue;
+        const num = piece.nums[r][c];
+        const nc = getNumColor(num);
+        const bx = c * miniSize + mg;
+        const by = r * miniSize + mg;
+        const bw = miniSize - mg * 2;
+        const bh = miniSize - mg * 2;
+
+        // Rounded rect
+        pctx.beginPath();
+        pctx.moveTo(bx + rr, by);
+        pctx.lineTo(bx + bw - rr, by);
+        pctx.quadraticCurveTo(bx + bw, by, bx + bw, by + rr);
+        pctx.lineTo(bx + bw, by + bh - rr);
+        pctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - rr, by + bh);
+        pctx.lineTo(bx + rr, by + bh);
+        pctx.quadraticCurveTo(bx, by + bh, bx, by + bh - rr);
+        pctx.lineTo(bx, by + rr);
+        pctx.quadraticCurveTo(bx, by, bx + rr, by);
+        pctx.closePath();
+        pctx.fillStyle = nc.bg;
+        pctx.fill();
+
+        // Number
+        const fs = miniSize * 0.45;
+        pctx.fillStyle = nc.fg;
+        pctx.font = `800 ${fs}px sans-serif`;
+        pctx.textAlign = 'center';
+        pctx.textBaseline = 'middle';
+        pctx.fillText(String(num), bx + bw / 2, by + bh / 2 + 0.5);
+      }
+    }
+    return pc;
   }
 
-  function onMove(e) {
-    if (animating) return;
-    const cell = getCell(e);
-    // Adjust hover to center the piece
-    if (cell && selectedPiece >= 0 && pieces[selectedPiece]) {
-      const p = pieces[selectedPiece];
-      cell.row -= Math.floor(p.shape.length / 2);
-      cell.col -= Math.floor(p.shape[0].length / 2);
-    }
-    hoverCell = cell;
+  // =====================
+  // DRAG & DROP
+  // =====================
+  function startDrag(idx, e) {
+    dragging = true;
+    dragIndex = idx;
+    selectedPiece = -1;
+
+    const piece = pieces[idx];
+
+    // Create ghost canvas at board-cell size
+    const ghostCanvas = createPieceCanvas(piece, cellSize);
+    dragGhost.innerHTML = '';
+    dragGhost.appendChild(ghostCanvas);
+    dragGhost.classList.add('active');
+
+    // Calculate offsets so ghost is centered on finger
+    dragOffsetX = parseInt(ghostCanvas.style.width) / 2;
+    dragOffsetY = parseInt(ghostCanvas.style.height) / 2;
+
+    // Position ghost — offset upward so user can see it above their thumb
+    const fingerOffset = 60;
+    dragGhost.style.left = (e.clientX - dragOffsetX) + 'px';
+    dragGhost.style.top = (e.clientY - dragOffsetY - fingerOffset) + 'px';
+
+    // Calculate hover cell
+    updateDragHover(e.clientX, e.clientY - fingerOffset);
+
+    renderTray();
+    draw();
+    haptic(5);
+  }
+
+  function onGlobalMove(e) {
+    if (!dragging) return;
+    e.preventDefault();
+
+    const fingerOffset = 60;
+    const ghostX = e.clientX - dragOffsetX;
+    const ghostY = e.clientY - dragOffsetY - fingerOffset;
+
+    dragGhost.style.left = ghostX + 'px';
+    dragGhost.style.top = ghostY + 'px';
+
+    updateDragHover(e.clientX, e.clientY - fingerOffset);
     draw();
   }
 
-  function onDown(e) {
-    if (animating) return;
-    const cell = getCell(e);
-    if (!cell) return;
+  function onGlobalUp(e) {
+    if (!dragging) return;
 
-    if (selectedPiece >= 0) {
-      const p = pieces[selectedPiece];
-      // Center the piece on tap
-      const adjRow = cell.row - Math.floor(p.shape.length / 2);
-      const adjCol = cell.col - Math.floor(p.shape[0].length / 2);
-      hoverCell = { row: adjRow, col: adjCol };
-      tryPlace();
+    const piece = pieces[dragIndex];
+    if (hoverCell && canPlace(piece, hoverCell.row, hoverCell.col)) {
+      placePiece(dragIndex);
+    } else {
+      // Invalid drop — snap back
+      haptic(10);
     }
+
+    // Clean up drag
+    dragging = false;
+    dragIndex = -1;
+    hoverCell = null;
+    dragGhost.classList.remove('active');
+    renderTray();
+    draw();
+  }
+
+  function updateDragHover(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const bx = clientX - rect.left;
+    const by = clientY - rect.top;
+
+    const piece = pieces[dragIndex];
+    // Calculate which board cell the center of the ghost maps to
+    const col = Math.floor(bx / cellSize) - Math.floor(piece.shape[0].length / 2);
+    const row = Math.floor(by / cellSize) - Math.floor(piece.shape.length / 2);
+
+    // Check if we're over the board area at all
+    if (bx < -cellSize || bx > rect.width + cellSize || by < -cellSize || by > rect.height + cellSize) {
+      hoverCell = null;
+    } else {
+      hoverCell = { row, col };
+    }
+  }
+
+  // =====================
+  // TAP-TO-PLACE (fallback)
+  // =====================
+  function onBoardTap(e) {
+    if (animating || dragging) return;
+
+    // If no piece selected, ignore
+    if (selectedPiece < 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const col = Math.floor((e.clientX - rect.left) / cellSize);
+    const row = Math.floor((e.clientY - rect.top) / cellSize);
+
+    const p = pieces[selectedPiece];
+    const adjRow = row - Math.floor(p.shape.length / 2);
+    const adjCol = col - Math.floor(p.shape[0].length / 2);
+    hoverCell = { row: adjRow, col: adjCol };
+
+    if (canPlace(p, adjRow, adjCol)) {
+      placePiece(selectedPiece);
+    }
+    hoverCell = null;
+    draw();
   }
 
   // =====================
@@ -482,13 +554,10 @@
     return false;
   }
 
-  function tryPlace() {
-    if (selectedPiece < 0 || !hoverCell || animating) return;
-    const piece = pieces[selectedPiece];
-    if (piece.used) return;
-    if (!canPlace(piece, hoverCell.row, hoverCell.col)) return;
+  function placePiece(idx) {
+    const piece = pieces[idx];
+    if (!hoverCell || !canPlace(piece, hoverCell.row, hoverCell.col)) return;
 
-    // Place the piece on the board
     let cellsPlaced = 0;
     for (let r = 0; r < piece.shape.length; r++) {
       for (let c = 0; c < piece.shape[r].length; c++) {
@@ -503,9 +572,12 @@
     selectedPiece = -1;
     hoverCell = null;
 
+    haptic(15);
+
     // Start merge + clear chain
     animating = true;
     renderTray();
+    updateHUD();
     draw();
 
     setTimeout(() => runChain(), 150);
@@ -525,11 +597,14 @@
       totalMerges += mergeCount;
 
       if (mergeCount > 0) {
-        score += mergeCount * 10 * (chainStep + 1);
+        const pts = mergeCount * 10 * (chainStep + 1);
+        score += pts;
+        showScorePop('+' + pts);
+        haptic(20);
+        updateHUD();
         draw();
         chainStep++;
-        // Continue merging after a short delay
-        setTimeout(step, 200);
+        setTimeout(step, 220);
         return;
       }
 
@@ -538,18 +613,19 @@
       totalClears += cleared;
 
       if (cleared > 0) {
-        score += cleared * GRID * 2;
+        const pts = cleared * GRID * 2;
+        score += pts;
+        showScorePop('+' + pts);
+        haptic(30);
+        updateHUD();
         draw();
-        // After clearing, check for new merges
-        setTimeout(step, 250);
+        setTimeout(step, 260);
         return;
       }
 
       // Chain complete
-      if (totalMerges > 0 || totalClears > 0) {
-        if (totalMerges >= 3) showPopup('CHAIN!', 'merge-pop');
-        else if (totalClears >= 2) showPopup('COMBO!', 'clear-pop');
-      }
+      if (totalMerges >= 3) showPopup('CHAIN!', 'merge-pop');
+      else if (totalClears >= 2) showPopup('COMBO!', 'clear-pop');
 
       // Check if all 3 used → new set
       if (pieces.every(p => p.used)) {
@@ -562,7 +638,6 @@
       draw();
       save();
 
-      // Check game over
       if (isGameOver()) {
         setTimeout(showGameOver, 400);
       }
@@ -571,13 +646,8 @@
     step();
   }
 
-  // Merge: find adjacent pairs with same number, merge them
-  // Returns number of merges performed in this pass
   function doMerges() {
     let merges = 0;
-
-    // Scan bottom-right to top-left so merges "settle" naturally
-    // But actually, scan all and collect merge targets, then apply
     const merged = Array.from({ length: GRID }, () => Array(GRID).fill(false));
 
     for (let r = 0; r < GRID; r++) {
@@ -585,16 +655,15 @@
         if (!board[r][c] || merged[r][c]) continue;
         const val = board[r][c];
 
-        // Check right neighbor
+        // Check right
         if (c + 1 < GRID && board[r][c + 1] === val && !merged[r][c + 1]) {
           board[r][c + 1] = val * 2;
           board[r][c] = 0;
           merged[r][c + 1] = true;
           merges++;
-          continue; // This cell is now empty, move on
+          continue;
         }
-
-        // Check bottom neighbor
+        // Check down
         if (r + 1 < GRID && board[r + 1][c] === val && !merged[r + 1][c]) {
           board[r + 1][c] = val * 2;
           board[r][c] = 0;
@@ -603,11 +672,9 @@
         }
       }
     }
-
     return merges;
   }
 
-  // Clear full rows and columns
   function doClear() {
     const rowsToClear = [];
     const colsToClear = [];
@@ -645,6 +712,7 @@
   }
 
   function showGameOver() {
+    haptic(50);
     $('overScore').textContent = score.toLocaleString();
 
     const oldBest = parseInt(localStorage.getItem(BEST_KEY)) || 0;
@@ -655,7 +723,6 @@
     }
     $('overBest').textContent = isNew ? 'New High Score!' : (oldBest > 0 ? `Best: ${oldBest.toLocaleString()}` : '');
 
-    // Find highest number on board
     let highest = 0;
     for (let r = 0; r < GRID; r++) {
       for (let c = 0; c < GRID; c++) {
@@ -669,12 +736,41 @@
   }
 
   // =====================
-  // POPUP
+  // HAPTIC FEEDBACK
+  // =====================
+  function haptic(ms) {
+    if (navigator.vibrate) {
+      navigator.vibrate(ms);
+    }
+  }
+
+  // =====================
+  // POPUPS
   // =====================
   function showPopup(text, cls) {
     popup.textContent = text;
     popup.className = 'popup show ' + cls;
     setTimeout(() => popup.classList.remove('show'), 1000);
+  }
+
+  function showScorePop(text) {
+    const sv = $('scoreVal');
+    const rect = sv.getBoundingClientRect();
+
+    scorePop.textContent = text;
+    scorePop.style.left = (rect.left + rect.width / 2) + 'px';
+    scorePop.style.top = (rect.bottom + 4) + 'px';
+    scorePop.style.transform = 'translateX(-50%) translateY(0)';
+    scorePop.className = 'score-pop';
+
+    // Force reflow
+    void scorePop.offsetWidth;
+    scorePop.classList.add('show');
+    setTimeout(() => scorePop.classList.remove('show'), 600);
+
+    // Score bump animation
+    sv.classList.add('bump');
+    setTimeout(() => sv.classList.remove('bump'), 150);
   }
 
   // =====================
