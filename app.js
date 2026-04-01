@@ -13,21 +13,21 @@
   const SAVE_KEY = 'numdrop_save';
   const BEST_KEY = 'numdrop_best';
 
-  // Number → color mapping (2048-inspired, vibrant on dark)
+  // Number → color mapping (vibrant & colorful)
   const NUM_COLORS = {
-    2:    { bg: '#4a4458', fg: '#e8e4f0' },
-    4:    { bg: '#5b4e6e', fg: '#f0ecf5' },
-    8:    { bg: '#c47f32', fg: '#fff' },
-    16:   { bg: '#d46b3a', fg: '#fff' },
-    32:   { bg: '#d95040', fg: '#fff' },
-    64:   { bg: '#e03030', fg: '#fff' },
-    128:  { bg: '#e6c440', fg: '#fff' },
-    256:  { bg: '#e6c020', fg: '#fff' },
-    512:  { bg: '#e0b810', fg: '#fff' },
-    1024: { bg: '#ddb000', fg: '#fff' },
-    2048: { bg: '#edc22e', fg: '#fff' },
-    4096: { bg: '#a040e0', fg: '#fff' },
-    8192: { bg: '#6020c0', fg: '#fff' },
+    2:    { bg: '#5b7cf7', fg: '#fff' },
+    4:    { bg: '#8b5cf6', fg: '#fff' },
+    8:    { bg: '#f59e0b', fg: '#fff' },
+    16:   { bg: '#f97316', fg: '#fff' },
+    32:   { bg: '#ef4444', fg: '#fff' },
+    64:   { bg: '#ec4899', fg: '#fff' },
+    128:  { bg: '#10b981', fg: '#fff' },
+    256:  { bg: '#14b8a6', fg: '#fff' },
+    512:  { bg: '#06b6d4', fg: '#fff' },
+    1024: { bg: '#f43f5e', fg: '#fff' },
+    2048: { bg: '#eab308', fg: '#fff' },
+    4096: { bg: '#a855f7', fg: '#fff' },
+    8192: { bg: '#6366f1', fg: '#fff' },
   };
   function getNumColor(n) {
     return NUM_COLORS[n] || { bg: '#4020a0', fg: '#fff' };
@@ -264,7 +264,7 @@
           ctx.fillRect(x + 2, y + 2, w - 4, Math.max(2, h * 0.12));
           drawNum(board[r][c], x, y, w, h, nc.fg);
         } else {
-          const shade = (r + c) % 2 === 0 ? '#181b28' : '#1c1f2e';
+          const shade = (r + c) % 2 === 0 ? '#1a1d30' : '#212540';
           roundRect(x, y, w, h, radius, shade);
         }
       }

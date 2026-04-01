@@ -58,15 +58,15 @@ body {
 .bg-num {
   position: absolute;
   font-weight: 900; font-size: 48px;
-  opacity: 0.06;
+  opacity: 0.1;
   animation: drift 16s ease-in-out infinite;
 }
-.n1 { top: 12%; left: 8%; color: #eee4da; animation-delay: 0s; }
-.n2 { top: 25%; right: 12%; color: #f2b179; animation-delay: -3s; font-size: 56px; }
-.n3 { top: 55%; left: 15%; color: #f67c5f; animation-delay: -6s; font-size: 40px; }
-.n4 { bottom: 30%; right: 20%; color: #ede0c8; animation-delay: -9s; }
-.n5 { top: 42%; left: 60%; color: #f59563; animation-delay: -4s; font-size: 36px; }
-.n6 { bottom: 15%; left: 40%; color: #f65e3b; animation-delay: -11s; font-size: 52px; }
+.n1 { top: 12%; left: 8%; color: #5b7cf7; animation-delay: 0s; }
+.n2 { top: 25%; right: 12%; color: #f59e0b; animation-delay: -3s; font-size: 56px; }
+.n3 { top: 55%; left: 15%; color: #ef4444; animation-delay: -6s; font-size: 40px; }
+.n4 { bottom: 30%; right: 20%; color: #8b5cf6; animation-delay: -9s; }
+.n5 { top: 42%; left: 60%; color: #10b981; animation-delay: -4s; font-size: 36px; }
+.n6 { bottom: 15%; left: 40%; color: #ec4899; animation-delay: -11s; font-size: 52px; }
 
 @keyframes drift {
   0%, 100% { transform: translateY(0) rotate(0deg); }
