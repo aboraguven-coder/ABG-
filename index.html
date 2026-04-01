@@ -2,329 +2,86 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NovaDrop – Next-Level Finds</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>BlockDrop - Puzzle Game</title>
+  <meta name="description" content="A relaxing block puzzle game. No timer, no pressure. Play anytime, anywhere — no internet needed." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0f1221" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
 </head>
 <body>
+  <div id="app">
+    <!-- START SCREEN -->
+    <div class="screen active" id="startScreen">
+      <div class="start-bg">
+        <div class="float-block fb1"></div>
+        <div class="float-block fb2"></div>
+        <div class="float-block fb3"></div>
+        <div class="float-block fb4"></div>
+      </div>
+      <div class="start-content">
+        <h1 class="game-title">BLOCK<span>DROP</span></h1>
+        <p class="game-subtitle">No timer. No pressure. Just puzzles.</p>
+        <div class="start-buttons">
+          <button class="btn btn-primary" id="btnPlay">Play</button>
+          <button class="btn btn-secondary" id="btnContinue" style="display:none">Continue</button>
+        </div>
+        <div class="start-highscore" id="startHighscore"></div>
+      </div>
+    </div>
 
-  <!-- NAV -->
-  <nav class="navbar" id="navbar">
-    <div class="nav-inner">
-      <a href="#" class="logo">NOVA<span>DROP</span></a>
-      <ul class="nav-links">
-        <li><a href="#products">Shop</a></li>
-        <li><a href="#categories">Categories</a></li>
-        <li><a href="#deals">Hot Deals</a></li>
-        <li><a href="#about">About</a></li>
-      </ul>
-      <div class="nav-actions">
-        <button class="icon-btn" onclick="toggleSearch()">&#9906;</button>
-        <button class="icon-btn" onclick="toggleCart()">&#128722; <span class="cart-count" id="cartCount">0</span></button>
-        <button class="nav-cta" onclick="document.getElementById('products').scrollIntoView({behavior:'smooth'})">Shop Now</button>
+    <!-- GAME SCREEN -->
+    <div class="screen" id="gameScreen">
+      <div class="game-header">
+        <button class="icon-btn" id="btnPause" title="Pause">II</button>
+        <div class="score-display">
+          <div class="score-label">Score</div>
+          <div class="score-value" id="scoreValue">0</div>
+        </div>
+        <div class="best-display">
+          <div class="score-label">Best</div>
+          <div class="score-value" id="bestValue">0</div>
+        </div>
       </div>
-      <button class="hamburger" onclick="toggleMenu()">&#9776;</button>
-    </div>
-    <div class="mobile-menu" id="mobileMenu">
-      <a href="#products">Shop</a>
-      <a href="#categories">Categories</a>
-      <a href="#deals">Hot Deals</a>
-      <a href="#about">About</a>
-    </div>
-    <div class="search-bar" id="searchBar">
-      <input type="text" placeholder="Search for products..." id="searchInput" oninput="filterProducts()" />
-      <button onclick="toggleSearch()">&#10005;</button>
-    </div>
-  </nav>
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-bg">
-      <div class="orb orb1"></div>
-      <div class="orb orb2"></div>
-      <div class="orb orb3"></div>
-      <div class="grid-overlay"></div>
-    </div>
-    <div class="hero-content">
-      <div class="hero-badge">&#9889; New Arrivals Every Week</div>
-      <h1>Discover Products<br /><span class="gradient-text">That Define You</span></h1>
-      <p>Curated. Fast-shipped. Incredible quality. Shop the items everyone's talking about — delivered straight to your door.</p>
-      <div class="hero-btns">
-        <button class="btn-primary" onclick="document.getElementById('products').scrollIntoView({behavior:'smooth'})">Explore Collection</button>
-        <button class="btn-ghost" onclick="document.getElementById('deals').scrollIntoView({behavior:'smooth'})">&#128293; Hot Deals</button>
+      <div class="board-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="combo-popup" id="comboPopup"></div>
       </div>
-      <div class="hero-stats">
-        <div class="stat"><span class="stat-num">50K+</span><span>Happy Customers</span></div>
-        <div class="stat-divider"></div>
-        <div class="stat"><span class="stat-num">1,200+</span><span>Products</span></div>
-        <div class="stat-divider"></div>
-        <div class="stat"><span class="stat-num">4.9★</span><span>Avg. Rating</span></div>
-      </div>
-    </div>
-    <div class="hero-visual">
-      <div class="floating-card card-a">&#127381; Trending Now</div>
-      <div class="floating-card card-b">&#9989; Free Shipping $50+</div>
-      <div class="floating-card card-c">&#128176; Best Price Guarantee</div>
-      <div class="hero-image-ring">
-        <div class="ring ring1"></div>
-        <div class="ring ring2"></div>
-        <div class="hero-icon">&#127381;</div>
-      </div>
-    </div>
-  </section>
 
-  <!-- MARQUEE BANNER -->
-  <div class="marquee-wrap">
-    <div class="marquee-track">
-      <span>&#9889; FREE SHIPPING ON ORDERS OVER $50</span>
-      <span>&#127381; NEW DROPS EVERY WEEK</span>
-      <span>&#128176; 30-DAY MONEY BACK GUARANTEE</span>
-      <span>&#9889; SECURE CHECKOUT</span>
-      <span>&#127381; LIMITED TIME DEALS</span>
-      <span>&#128716; WORLDWIDE DELIVERY</span>
-      <span>&#9889; FREE SHIPPING ON ORDERS OVER $50</span>
-      <span>&#127381; NEW DROPS EVERY WEEK</span>
-      <span>&#128176; 30-DAY MONEY BACK GUARANTEE</span>
-      <span>&#9889; SECURE CHECKOUT</span>
-      <span>&#127381; LIMITED TIME DEALS</span>
-      <span>&#128716; WORLDWIDE DELIVERY</span>
+      <div class="pieces-tray" id="piecesTray"></div>
+    </div>
+
+    <!-- PAUSE OVERLAY -->
+    <div class="overlay" id="pauseOverlay">
+      <div class="modal">
+        <h2>Paused</h2>
+        <div class="modal-buttons">
+          <button class="btn btn-primary" id="btnResume">Resume</button>
+          <button class="btn btn-secondary" id="btnRestartPause">Restart</button>
+          <button class="btn btn-ghost" id="btnHomePause">Home</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GAME OVER OVERLAY -->
+    <div class="overlay" id="gameOverOverlay">
+      <div class="modal">
+        <h2>Game Over</h2>
+        <div class="final-score">
+          <div class="final-label">Score</div>
+          <div class="final-value" id="finalScore">0</div>
+        </div>
+        <div class="final-best" id="finalBest"></div>
+        <div class="modal-buttons">
+          <button class="btn btn-primary" id="btnRestartOver">Play Again</button>
+          <button class="btn btn-ghost" id="btnHomeOver">Home</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- CATEGORIES -->
-  <section class="section categories-section" id="categories">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-tag">Browse by</span>
-        <h2>Shop Categories</h2>
-        <p>Find exactly what you're looking for</p>
-      </div>
-      <div class="categories-grid">
-        <div class="cat-card" onclick="filterByCategory('Tech')">
-          <div class="cat-icon">&#128241;</div>
-          <h3>Tech & Gadgets</h3>
-          <span>120+ items</span>
-        </div>
-        <div class="cat-card" onclick="filterByCategory('Home')">
-          <div class="cat-icon">&#127968;</div>
-          <h3>Home & Living</h3>
-          <span>85+ items</span>
-        </div>
-        <div class="cat-card" onclick="filterByCategory('Fashion')">
-          <div class="cat-icon">&#128084;</div>
-          <h3>Fashion</h3>
-          <span>200+ items</span>
-        </div>
-        <div class="cat-card" onclick="filterByCategory('Beauty')">
-          <div class="cat-icon">&#128144;</div>
-          <h3>Beauty & Care</h3>
-          <span>95+ items</span>
-        </div>
-        <div class="cat-card" onclick="filterByCategory('Sports')">
-          <div class="cat-icon">&#127947;</div>
-          <h3>Sports & Outdoor</h3>
-          <span>60+ items</span>
-        </div>
-        <div class="cat-card" onclick="filterByCategory('Pets')">
-          <div class="cat-icon">&#128062;</div>
-          <h3>Pets</h3>
-          <span>45+ items</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PRODUCTS -->
-  <section class="section products-section" id="products">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-tag">Our Collection</span>
-        <h2>Featured Products</h2>
-        <p>Handpicked items that customers love</p>
-      </div>
-      <div class="filter-bar">
-        <button class="filter-btn active" onclick="setFilter(this,'all')">All</button>
-        <button class="filter-btn" onclick="setFilter(this,'Tech')">Tech</button>
-        <button class="filter-btn" onclick="setFilter(this,'Home')">Home</button>
-        <button class="filter-btn" onclick="setFilter(this,'Fashion')">Fashion</button>
-        <button class="filter-btn" onclick="setFilter(this,'Beauty')">Beauty</button>
-        <button class="filter-btn" onclick="setFilter(this,'Sports')">Sports</button>
-        <button class="filter-btn" onclick="setFilter(this,'Pets')">Pets</button>
-      </div>
-      <div class="products-grid" id="productsGrid"></div>
-    </div>
-  </section>
-
-  <!-- HOT DEALS -->
-  <section class="section deals-section" id="deals">
-    <div class="container">
-      <div class="section-header light">
-        <span class="section-tag">Limited Time</span>
-        <h2>&#128293; Hot Deals</h2>
-        <p>Don't miss these incredible offers — they won't last long</p>
-      </div>
-      <div class="deals-grid" id="dealsGrid"></div>
-    </div>
-  </section>
-
-  <!-- TRUST BADGES -->
-  <section class="trust-section">
-    <div class="container">
-      <div class="trust-grid">
-        <div class="trust-item">
-          <div class="trust-icon">&#128716;</div>
-          <h4>Worldwide Shipping</h4>
-          <p>We ship to 50+ countries with tracking</p>
-        </div>
-        <div class="trust-item">
-          <div class="trust-icon">&#128274;</div>
-          <h4>Secure Payments</h4>
-          <p>SSL encrypted checkout — always safe</p>
-        </div>
-        <div class="trust-item">
-          <div class="trust-icon">&#128260;</div>
-          <h4>Easy Returns</h4>
-          <p>30-day hassle-free return policy</p>
-        </div>
-        <div class="trust-item">
-          <div class="trust-icon">&#128172;</div>
-          <h4>24/7 Support</h4>
-          <p>Our team is always here to help you</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- TESTIMONIALS -->
-  <section class="section testimonials-section">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-tag">Reviews</span>
-        <h2>What Customers Say</h2>
-      </div>
-      <div class="testimonials-grid">
-        <div class="testimonial-card">
-          <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-          <p>"Absolutely love my purchase! The quality exceeded my expectations and it arrived way faster than expected. Will definitely be ordering again!"</p>
-          <div class="reviewer"><div class="avatar">SJ</div><div><strong>Sarah J.</strong><span>Verified Buyer</span></div></div>
-        </div>
-        <div class="testimonial-card">
-          <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-          <p>"NovaDrop has the best product curation I've seen. Every item I've ordered has been exactly as described. Customer service is top-notch too!"</p>
-          <div class="reviewer"><div class="avatar">MR</div><div><strong>Marcus R.</strong><span>Verified Buyer</span></div></div>
-        </div>
-        <div class="testimonial-card">
-          <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-          <p>"Great prices, great products. I got the smart LED lights and they completely transformed my room. Highly recommend this store!"</p>
-          <div class="reviewer"><div class="avatar">AL</div><div><strong>Aisha L.</strong><span>Verified Buyer</span></div></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- NEWSLETTER -->
-  <section class="newsletter-section" id="about">
-    <div class="container">
-      <div class="newsletter-inner">
-        <div class="nl-orb nl-orb1"></div>
-        <div class="nl-orb nl-orb2"></div>
-        <div class="nl-content">
-          <span class="section-tag">Stay in the loop</span>
-          <h2>Get Exclusive Deals<br />in Your Inbox</h2>
-          <p>Join 50,000+ subscribers and be the first to know about new drops, flash sales, and special offers.</p>
-          <form class="nl-form" onsubmit="handleSubscribe(event)">
-            <input type="email" placeholder="Enter your email address..." required />
-            <button type="submit">Subscribe</button>
-          </form>
-          <p class="nl-disclaimer">No spam. Unsubscribe anytime. &#128274; We respect your privacy.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="#" class="logo">NOVA<span>DROP</span></a>
-          <p>Curating the world's best products and bringing them directly to your door. Quality, speed, and trust — that's the NovaDrop promise.</p>
-          <div class="social-links">
-            <a href="#" class="social-btn">&#120143;</a>
-            <a href="#" class="social-btn">in</a>
-            <a href="#" class="social-btn">&#9654;</a>
-            <a href="#" class="social-btn">&#128247;</a>
-          </div>
-        </div>
-        <div class="footer-col">
-          <h4>Shop</h4>
-          <ul>
-            <li><a href="#products">All Products</a></li>
-            <li><a href="#deals">Hot Deals</a></li>
-            <li><a href="#categories">Categories</a></li>
-            <li><a href="#">New Arrivals</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Company</h4>
-          <ul>
-            <li><a href="#">About Us</a></li>
-            <li><a href="#">Careers</a></li>
-            <li><a href="#">Press</a></li>
-            <li><a href="#">Partners</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Support</h4>
-          <ul>
-            <li><a href="#">FAQ</a></li>
-            <li><a href="#">Shipping Info</a></li>
-            <li><a href="#">Returns</a></li>
-            <li><a href="#">Contact Us</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; 2026 NovaDrop. All rights reserved.</p>
-        <div class="footer-legal">
-          <a href="#">Privacy Policy</a>
-          <a href="#">Terms of Service</a>
-          <a href="#">Cookie Policy</a>
-        </div>
-      </div>
-    </div>
-  </footer>
-
-  <!-- CART DRAWER -->
-  <div class="cart-overlay" id="cartOverlay" onclick="toggleCart()"></div>
-  <div class="cart-drawer" id="cartDrawer">
-    <div class="cart-header">
-      <h3>Your Cart <span id="cartItemCount">(0 items)</span></h3>
-      <button onclick="toggleCart()">&#10005;</button>
-    </div>
-    <div class="cart-items" id="cartItems">
-      <div class="cart-empty" id="cartEmpty">
-        <div style="font-size:3rem">&#128722;</div>
-        <p>Your cart is empty</p>
-        <button onclick="toggleCart(); document.getElementById('products').scrollIntoView({behavior:'smooth'})">Start Shopping</button>
-      </div>
-    </div>
-    <div class="cart-footer" id="cartFooter" style="display:none">
-      <div class="cart-total">
-        <span>Total</span>
-        <span id="cartTotal">$0.00</span>
-      </div>
-      <button class="checkout-btn" onclick="handleCheckout()">Checkout Now &#8594;</button>
-    </div>
-  </div>
-
-  <!-- TOAST -->
-  <div class="toast" id="toast"></div>
-
-  <!-- EmailJS SDK (free order notifications) -->
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
