@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>ShadowKeep</title>
-  <meta name="description" content="A turn-based dungeon crawler. Explore, fight, collect — no timer, no internet. Play anytime." />
+  <title>NumDrop</title>
+  <meta name="description" content="Place numbered shapes, merge matching numbers, clear lines. A relaxing puzzle — no timer, no internet needed." />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#0a0c14" />
+  <meta name="theme-color" content="#0f1119" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,106 +16,74 @@
     <!-- TITLE SCREEN -->
     <div class="screen active" id="titleScreen">
       <div class="title-bg">
-        <div class="torch torch-l"></div>
-        <div class="torch torch-r"></div>
+        <div class="bg-num n1">2</div>
+        <div class="bg-num n2">8</div>
+        <div class="bg-num n3">32</div>
+        <div class="bg-num n4">4</div>
+        <div class="bg-num n5">16</div>
+        <div class="bg-num n6">64</div>
       </div>
       <div class="title-content">
-        <div class="title-icon">&#9876;</div>
-        <h1 class="title-name">SHADOW<span>KEEP</span></h1>
-        <p class="title-sub">Descend. Fight. Survive.</p>
+        <h1 class="title-name">NUM<span>DROP</span></h1>
+        <p class="title-sub">Drop. Merge. Blast.</p>
         <div class="title-buttons">
           <button class="btn btn-primary" id="btnNewGame">New Game</button>
           <button class="btn btn-secondary" id="btnContinue" style="display:none">Continue</button>
         </div>
-        <div class="title-stats" id="titleStats"></div>
-        <div class="title-how">
-          <button class="btn btn-ghost" id="btnHowTo">How to Play</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- HOW TO PLAY -->
-    <div class="screen" id="howScreen">
-      <div class="how-content">
-        <h2>How to Play</h2>
-        <div class="how-list">
-          <div class="how-item"><span class="how-icon">&#128694;</span><div><strong>Move</strong><br>Tap/swipe on the map or use the D-pad to move. Enemies move when you move.</div></div>
-          <div class="how-item"><span class="how-icon">&#9876;</span><div><strong>Fight</strong><br>Walk into an enemy to attack it. Each enemy has HP shown above it.</div></div>
-          <div class="how-item"><span class="how-icon">&#127860;</span><div><strong>Items</strong><br>Walk over potions to heal and gold to increase your score.</div></div>
-          <div class="how-item"><span class="how-icon">&#128682;</span><div><strong>Descend</strong><br>Find the stairs on each floor to go deeper. Enemies get tougher.</div></div>
-          <div class="how-item"><span class="how-icon">&#128190;</span><div><strong>Save</strong><br>Your game is saved every move. Close and come back anytime.</div></div>
-        </div>
-        <button class="btn btn-primary" id="btnBackHow">Got it</button>
+        <div class="title-best" id="titleBest"></div>
       </div>
     </div>
 
     <!-- GAME SCREEN -->
     <div class="screen" id="gameScreen">
       <div class="game-top">
-        <button class="icon-btn" id="btnMenu">&#9776;</button>
-        <div class="stat-bar">
-          <div class="stat-item hp-stat">
-            <span class="stat-icon">&#10084;</span>
-            <div class="hp-bar-wrap">
-              <div class="hp-bar-fill" id="hpBar"></div>
-            </div>
-            <span class="stat-text" id="hpText">20/20</span>
+        <button class="icon-btn" id="btnPause">II</button>
+        <div class="score-area">
+          <div class="score-box">
+            <div class="score-label">SCORE</div>
+            <div class="score-val" id="scoreVal">0</div>
+          </div>
+          <div class="score-box">
+            <div class="score-label">BEST</div>
+            <div class="score-val dim" id="bestVal">0</div>
           </div>
         </div>
-        <div class="stat-row">
-          <div class="stat-pill"><span>&#9876;</span> <span id="atkText">3</span></div>
-          <div class="stat-pill"><span>&#128176;</span> <span id="goldText">0</span></div>
-          <div class="stat-pill"><span>&#128682;</span> <span id="floorText">F1</span></div>
-        </div>
       </div>
 
-      <div class="map-container" id="mapContainer">
-        <canvas id="mapCanvas"></canvas>
+      <div class="board-wrap" id="boardWrap">
+        <canvas id="boardCanvas"></canvas>
       </div>
 
-      <div class="game-log" id="gameLog">
-        <div class="log-text" id="logText">Welcome to ShadowKeep...</div>
-      </div>
+      <div class="popup" id="popup"></div>
 
-      <div class="dpad">
-        <button class="dpad-btn dpad-up" data-dir="up">&#9650;</button>
-        <button class="dpad-btn dpad-left" data-dir="left">&#9664;</button>
-        <button class="dpad-btn dpad-center" data-dir="wait">&#8226;</button>
-        <button class="dpad-btn dpad-right" data-dir="right">&#9654;</button>
-        <button class="dpad-btn dpad-down" data-dir="down">&#9660;</button>
-      </div>
+      <div class="tray" id="tray"></div>
     </div>
 
-    <!-- MENU OVERLAY -->
-    <div class="overlay" id="menuOverlay">
+    <!-- PAUSE OVERLAY -->
+    <div class="overlay" id="pauseOverlay">
       <div class="modal">
         <h2>Paused</h2>
-        <div class="pause-stats">
-          <div>Floor: <strong id="pauseFloor">1</strong></div>
-          <div>Gold: <strong id="pauseGold">0</strong></div>
-        </div>
-        <div class="modal-buttons">
+        <div class="modal-btns">
           <button class="btn btn-primary" id="btnResume">Resume</button>
-          <button class="btn btn-secondary" id="btnRestart">New Game</button>
-          <button class="btn btn-ghost" id="btnHomeMenu">Home</button>
+          <button class="btn btn-secondary" id="btnRestartP">Restart</button>
+          <button class="btn btn-ghost" id="btnHomeP">Home</button>
         </div>
       </div>
     </div>
 
-    <!-- DEATH OVERLAY -->
-    <div class="overlay" id="deathOverlay">
-      <div class="modal death-modal">
-        <div class="death-icon">&#9760;</div>
-        <h2>You Died</h2>
-        <div class="death-stats">
-          <div class="death-stat"><span>Floor Reached</span><strong id="deathFloor">1</strong></div>
-          <div class="death-stat"><span>Gold Collected</span><strong id="deathGold">0</strong></div>
-          <div class="death-stat"><span>Enemies Slain</span><strong id="deathKills">0</strong></div>
+    <!-- GAME OVER OVERLAY -->
+    <div class="overlay" id="overOverlay">
+      <div class="modal">
+        <h2>Game Over</h2>
+        <div class="over-score">
+          <div class="over-label">Score</div>
+          <div class="over-val" id="overScore">0</div>
         </div>
-        <div class="death-record" id="deathRecord"></div>
-        <div class="modal-buttons">
-          <button class="btn btn-primary" id="btnRetry">Try Again</button>
-          <button class="btn btn-ghost" id="btnHomeDeath">Home</button>
+        <div class="over-best" id="overBest"></div>
+        <div class="over-highest" id="overHighest"></div>
+        <div class="modal-btns">
+          <button class="btn btn-primary" id="btnRetry">Play Again</button>
+          <button class="btn btn-ghost" id="btnHomeO">Home</button>
         </div>
       </div>
     </div>

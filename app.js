@@ -1,5 +1,5 @@
 // =============================================
-// ShadowKeep — Turn-Based Dungeon Crawler
+// NumDrop — Number Merge + Block Blast Puzzle
 // No timer, offline, auto-save every move
 // =============================================
 
@@ -9,783 +9,687 @@
   // =====================
   // CONFIG
   // =====================
-  const MAP_W = 30;
-  const MAP_H = 24;
-  const SAVE_KEY = 'shadowkeep_save';
-  const BEST_KEY = 'shadowkeep_best';
-  const TILE_SIZE_BASE = 20;
+  const GRID = 8;
+  const SAVE_KEY = 'numdrop_save';
+  const BEST_KEY = 'numdrop_best';
 
-  // Tile types
-  const T = {
-    VOID: 0,
-    FLOOR: 1,
-    WALL: 2,
-    STAIRS: 3,
-    POTION: 4,
-    GOLD: 5,
+  // Number → color mapping (2048-inspired, dark-theme adjusted)
+  const NUM_COLORS = {
+    2:    { bg: '#4a4458', fg: '#e8e4f0' },
+    4:    { bg: '#5b4e6e', fg: '#f0ecf5' },
+    8:    { bg: '#c47f32', fg: '#fff' },
+    16:   { bg: '#d46b3a', fg: '#fff' },
+    32:   { bg: '#d95040', fg: '#fff' },
+    64:   { bg: '#e03030', fg: '#fff' },
+    128:  { bg: '#e6c440', fg: '#fff' },
+    256:  { bg: '#e6c020', fg: '#fff' },
+    512:  { bg: '#e0b810', fg: '#fff' },
+    1024: { bg: '#ddb000', fg: '#fff' },
+    2048: { bg: '#edc22e', fg: '#fff' },
+    4096: { bg: '#a040e0', fg: '#fff' },
+    8192: { bg: '#6020c0', fg: '#fff' },
   };
 
-  // Colors
-  const TILE_COLORS = {
-    [T.VOID]:   '#0a0c14',
-    [T.FLOOR]:  '#1a1e30',
-    [T.WALL]:   '#2c3150',
-    [T.STAIRS]: '#1a1e30',
-    [T.POTION]: '#1a1e30',
-    [T.GOLD]:   '#1a1e30',
-  };
+  function getNumColor(n) {
+    if (NUM_COLORS[n]) return NUM_COLORS[n];
+    return { bg: '#4020a0', fg: '#fff' };
+  }
 
-  const PLAYER_COLOR = '#c084fc';
-  const ENEMY_COLORS = ['#ef4444', '#f97316', '#ec4899', '#f43f5e', '#dc2626'];
-  const STAIRS_COLOR = '#60a5fa';
-  const POTION_COLOR = '#34d399';
-  const GOLD_COLOR   = '#fbbf24';
-
-  // Enemy templates per difficulty tier
-  const ENEMY_TYPES = [
-    { name: 'Rat',       icon: 'r', hp: 3,  atk: 1, xpGold: 2  },
-    { name: 'Bat',       icon: 'b', hp: 4,  atk: 2, xpGold: 3  },
-    { name: 'Goblin',    icon: 'g', hp: 6,  atk: 3, xpGold: 5  },
-    { name: 'Skeleton',  icon: 's', hp: 8,  atk: 4, xpGold: 7  },
-    { name: 'Orc',       icon: 'o', hp: 12, atk: 5, xpGold: 10 },
-    { name: 'Wraith',    icon: 'w', hp: 15, atk: 6, xpGold: 12 },
-    { name: 'Troll',     icon: 't', hp: 20, atk: 7, xpGold: 15 },
-    { name: 'Demon',     icon: 'd', hp: 25, atk: 8, xpGold: 18 },
-    { name: 'Dragon',    icon: 'D', hp: 35, atk: 10, xpGold: 25 },
+  // Block shapes (same as Block Blast style)
+  const SHAPES = [
+    // 1-cell
+    [[1]],
+    // 2-cell
+    [[1, 1]],
+    [[1], [1]],
+    // 3-cell lines
+    [[1, 1, 1]],
+    [[1], [1], [1]],
+    // L-shapes (3-cell)
+    [[1, 1], [1, 0]],
+    [[1, 1], [0, 1]],
+    [[1, 0], [1, 1]],
+    [[0, 1], [1, 1]],
+    // 4-cell lines
+    [[1, 1, 1, 1]],
+    [[1], [1], [1], [1]],
+    // 4-cell square
+    [[1, 1], [1, 1]],
+    // T-shapes
+    [[1, 1, 1], [0, 1, 0]],
+    [[0, 1, 0], [1, 1, 1]],
+    [[1, 0], [1, 1], [1, 0]],
+    [[0, 1], [1, 1], [0, 1]],
+    // S/Z shapes
+    [[1, 1, 0], [0, 1, 1]],
+    [[0, 1, 1], [1, 1, 0]],
+    // L-shapes (4-cell)
+    [[1, 0], [1, 0], [1, 1]],
+    [[0, 1], [0, 1], [1, 1]],
+    [[1, 1], [1, 0], [1, 0]],
+    [[1, 1], [0, 1], [0, 1]],
+    // 5-cell line
+    [[1, 1, 1, 1, 1]],
+    [[1], [1], [1], [1], [1]],
+    // 2x3 / 3x2
+    [[1, 1, 1], [1, 1, 1]],
+    [[1, 1], [1, 1], [1, 1]],
+    // 3x3
+    [[1, 1, 1], [1, 1, 1], [1, 1, 1]],
+    // Corner shapes
+    [[1, 1, 1], [1, 0, 0]],
+    [[1, 1, 1], [0, 0, 1]],
+    [[1, 0, 0], [1, 1, 1]],
+    [[0, 0, 1], [1, 1, 1]],
   ];
 
   // =====================
   // STATE
   // =====================
-  let state = null; // { map, player, enemies, floor, gold, kills, messages }
+  let board = [];     // 8x8, each cell = 0 or a power-of-2 number
+  let pieces = [];    // current 3 pieces: { shape, nums (2D matching shape), used }
+  let score = 0;
+  let best = 0;
+  let selectedPiece = -1;
+  let hoverCell = null;
+  let animating = false;
 
+  // Canvas refs
   let canvas, ctx;
-  let tileSize = TILE_SIZE_BASE;
-  let cameraX = 0, cameraY = 0;
-  let viewW = 0, viewH = 0;
+  let cellSize = 0;
 
   // =====================
   // DOM
   // =====================
   const $ = id => document.getElementById(id);
 
-  const titleScreen   = $('titleScreen');
-  const howScreen      = $('howScreen');
-  const gameScreen     = $('gameScreen');
-  const menuOverlay    = $('menuOverlay');
-  const deathOverlay   = $('deathOverlay');
+  const titleScreen  = $('titleScreen');
+  const gameScreen   = $('gameScreen');
+  const pauseOverlay = $('pauseOverlay');
+  const overOverlay  = $('overOverlay');
+  const tray         = $('tray');
+  const popup        = $('popup');
 
   // =====================
   // INIT
   // =====================
   function init() {
-    canvas = $('mapCanvas');
+    canvas = $('boardCanvas');
     ctx = canvas.getContext('2d');
 
-    // Title buttons
-    $('btnNewGame').addEventListener('click', startNewGame);
-    $('btnContinue').addEventListener('click', loadAndResume);
-    $('btnHowTo').addEventListener('click', () => showScreen(howScreen));
-    $('btnBackHow').addEventListener('click', () => showScreen(titleScreen));
+    best = parseInt(localStorage.getItem(BEST_KEY)) || 0;
 
-    // Game buttons
-    $('btnMenu').addEventListener('click', showMenu);
-    $('btnResume').addEventListener('click', hideMenu);
-    $('btnRestart').addEventListener('click', () => { hideMenu(); startNewGame(); });
-    $('btnHomeMenu').addEventListener('click', () => { hideMenu(); goHome(); });
+    // Buttons
+    $('btnNewGame').onclick = startNew;
+    $('btnContinue').onclick = loadAndResume;
+    $('btnPause').onclick = () => pauseOverlay.classList.add('active');
+    $('btnResume').onclick = () => pauseOverlay.classList.remove('active');
+    $('btnRestartP').onclick = () => { pauseOverlay.classList.remove('active'); startNew(); };
+    $('btnHomeP').onclick = () => { pauseOverlay.classList.remove('active'); goHome(); };
+    $('btnRetry').onclick = () => { overOverlay.classList.remove('active'); startNew(); };
+    $('btnHomeO').onclick = () => { overOverlay.classList.remove('active'); goHome(); };
 
-    // Death buttons
-    $('btnRetry').addEventListener('click', () => { hideDeath(); startNewGame(); });
-    $('btnHomeDeath').addEventListener('click', () => { hideDeath(); goHome(); });
+    // Canvas pointer events
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointerleave', () => { hoverCell = null; draw(); });
 
-    // D-pad
-    document.querySelectorAll('.dpad-btn').forEach(btn => {
-      btn.addEventListener('click', () => handleDirection(btn.dataset.dir));
-    });
-
-    // Keyboard
-    window.addEventListener('keydown', onKey);
-
-    // Swipe on map
-    let touchStart = null;
-    canvas.addEventListener('pointerdown', e => {
-      touchStart = { x: e.clientX, y: e.clientY };
-    });
-    canvas.addEventListener('pointerup', e => {
-      if (!touchStart) return;
-      const dx = e.clientX - touchStart.x;
-      const dy = e.clientY - touchStart.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      touchStart = null;
-
-      if (dist < 15) {
-        // Tap — try to move toward tapped cell
-        handleTap(e);
-        return;
-      }
-      if (Math.abs(dx) > Math.abs(dy)) {
-        handleDirection(dx > 0 ? 'right' : 'left');
-      } else {
-        handleDirection(dy > 0 ? 'down' : 'up');
-      }
-    });
-
-    // Show title
-    updateTitle();
+    updateTitleScreen();
   }
 
   // =====================
   // SCREENS
   // =====================
-  function showScreen(screen) {
-    [titleScreen, howScreen, gameScreen].forEach(s => s.classList.remove('active'));
-    screen.classList.add('active');
+  function showScreen(s) {
+    [titleScreen, gameScreen].forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
   }
-
-  function showMenu() {
-    $('pauseFloor').textContent = state.floor;
-    $('pauseGold').textContent = state.gold;
-    menuOverlay.classList.add('active');
-  }
-  function hideMenu() { menuOverlay.classList.remove('active'); }
-
-  function showDeath() {
-    $('deathFloor').textContent = state.floor;
-    $('deathGold').textContent = state.gold;
-    $('deathKills').textContent = state.kills;
-
-    const best = loadBest();
-    const isRecord = state.floor > best.floor || (state.floor === best.floor && state.gold > best.gold);
-    if (isRecord) {
-      saveBest({ floor: state.floor, gold: state.gold, kills: state.kills });
-      $('deathRecord').textContent = 'New Record!';
-    } else {
-      $('deathRecord').textContent = best.floor > 0 ? `Record: Floor ${best.floor}` : '';
-    }
-
-    localStorage.removeItem(SAVE_KEY);
-    deathOverlay.classList.add('active');
-  }
-  function hideDeath() { deathOverlay.classList.remove('active'); }
 
   function goHome() {
     showScreen(titleScreen);
-    updateTitle();
+    updateTitleScreen();
   }
 
-  function updateTitle() {
-    const saved = localStorage.getItem(SAVE_KEY);
-    $('btnContinue').style.display = saved ? 'block' : 'none';
-
-    const best = loadBest();
-    $('titleStats').innerHTML = best.floor > 0
-      ? `Deepest: Floor ${best.floor} &bull; Best Gold: ${best.gold}`
-      : 'Enter the dungeon...';
+  function updateTitleScreen() {
+    best = parseInt(localStorage.getItem(BEST_KEY)) || 0;
+    $('titleBest').textContent = best > 0 ? `High Score: ${best.toLocaleString()}` : '';
+    $('btnContinue').style.display = localStorage.getItem(SAVE_KEY) ? 'block' : 'none';
   }
 
   // =====================
   // NEW GAME / LOAD
   // =====================
-  function startNewGame() {
-    state = {
-      map: null,
-      player: { x: 0, y: 0, hp: 20, maxHp: 20, atk: 3 },
-      enemies: [],
-      floor: 1,
-      gold: 0,
-      kills: 0,
-    };
+  function startNew() {
+    board = Array.from({ length: GRID }, () => Array(GRID).fill(0));
+    score = 0;
+    selectedPiece = -1;
+    hoverCell = null;
+    animating = false;
+    pieces = genPieces();
 
-    generateFloor();
     showScreen(gameScreen);
     sizeCanvas();
     updateHUD();
-    log('You enter the dungeon...', '');
-    render();
-    saveGame();
+    renderTray();
+    draw();
+    save();
   }
 
   function loadAndResume() {
-    const data = localStorage.getItem(SAVE_KEY);
-    if (!data) { startNewGame(); return; }
-    state = JSON.parse(data);
+    const data = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (!data) { startNew(); return; }
+    board = data.board;
+    score = data.score;
+    pieces = data.pieces;
+    selectedPiece = -1;
+    hoverCell = null;
+    animating = false;
+
     showScreen(gameScreen);
     sizeCanvas();
     updateHUD();
-    log('Welcome back, adventurer.', '');
-    render();
+    renderTray();
+    draw();
   }
 
   // =====================
-  // MAP GENERATION
+  // PIECE GENERATION
   // =====================
-  function generateFloor() {
-    // Create empty map
-    const map = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(T.WALL));
-
-    // Generate rooms using BSP-lite
-    const rooms = [];
-    carveRooms(map, rooms, 1, 1, MAP_W - 2, MAP_H - 2, 0);
-
-    // Connect rooms with corridors
-    for (let i = 1; i < rooms.length; i++) {
-      connectRooms(map, rooms[i - 1], rooms[i]);
+  function genPieces() {
+    const result = [];
+    for (let i = 0; i < 3; i++) {
+      const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+      const nums = genNums(shape);
+      result.push({ shape, nums, used: false });
     }
-
-    state.map = map;
-
-    // Place player in first room
-    const startRoom = rooms[0];
-    state.player.x = startRoom.cx;
-    state.player.y = startRoom.cy;
-
-    // Place stairs in last room
-    const endRoom = rooms[rooms.length - 1];
-    map[endRoom.cy][endRoom.cx] = T.STAIRS;
-
-    // Place enemies
-    state.enemies = [];
-    const numEnemies = 4 + Math.floor(state.floor * 1.5);
-    for (let i = 0; i < numEnemies; i++) {
-      const pos = randomFloorTile(map, state.player);
-      if (!pos) break;
-
-      // Pick enemy type based on floor
-      const maxTier = Math.min(ENEMY_TYPES.length - 1, Math.floor(state.floor / 2));
-      const minTier = Math.max(0, maxTier - 2);
-      const tier = minTier + Math.floor(Math.random() * (maxTier - minTier + 1));
-      const template = ENEMY_TYPES[tier];
-
-      // Scale slightly with floor
-      const scale = 1 + (state.floor - 1) * 0.08;
-      state.enemies.push({
-        x: pos.x, y: pos.y,
-        name: template.name,
-        icon: template.icon,
-        hp: Math.ceil(template.hp * scale),
-        maxHp: Math.ceil(template.hp * scale),
-        atk: Math.ceil(template.atk * scale),
-        xpGold: template.xpGold,
-        color: ENEMY_COLORS[Math.floor(Math.random() * ENEMY_COLORS.length)],
-      });
-    }
-
-    // Place potions
-    const numPotions = 2 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < numPotions; i++) {
-      const pos = randomFloorTile(map, state.player);
-      if (pos) map[pos.y][pos.x] = T.POTION;
-    }
-
-    // Place gold piles
-    const numGold = 3 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < numGold; i++) {
-      const pos = randomFloorTile(map, state.player);
-      if (pos) map[pos.y][pos.x] = T.GOLD;
-    }
+    return result;
   }
 
-  function carveRooms(map, rooms, x, y, w, h, depth) {
-    if (w < 5 || h < 5 || depth > 6) return;
+  function genNums(shape) {
+    // Generate number for each filled cell
+    // Higher scores → occasionally higher starting numbers
+    const tier = Math.min(3, Math.floor(score / 500));
+    const pool = [2, 2, 2, 2, 4, 4];
+    if (tier >= 1) pool.push(4, 4, 8);
+    if (tier >= 2) pool.push(8, 8);
+    if (tier >= 3) pool.push(16);
 
-    // Decide to carve a room or split
-    if (w <= 10 && h <= 10 && Math.random() < 0.6 || depth >= 5) {
-      // Carve a room
-      const rw = 3 + Math.floor(Math.random() * Math.min(w - 2, 6));
-      const rh = 3 + Math.floor(Math.random() * Math.min(h - 2, 5));
-      const rx = x + Math.floor(Math.random() * (w - rw));
-      const ry = y + Math.floor(Math.random() * (h - rh));
-
-      for (let row = ry; row < ry + rh; row++) {
-        for (let col = rx; col < rx + rw; col++) {
-          if (row > 0 && row < MAP_H - 1 && col > 0 && col < MAP_W - 1) {
-            map[row][col] = T.FLOOR;
-          }
-        }
-      }
-
-      rooms.push({
-        x: rx, y: ry, w: rw, h: rh,
-        cx: Math.floor(rx + rw / 2),
-        cy: Math.floor(ry + rh / 2),
-      });
-      return;
-    }
-
-    // Split
-    if (w > h) {
-      const split = Math.floor(w * (0.35 + Math.random() * 0.3));
-      carveRooms(map, rooms, x, y, split, h, depth + 1);
-      carveRooms(map, rooms, x + split, y, w - split, h, depth + 1);
-    } else {
-      const split = Math.floor(h * (0.35 + Math.random() * 0.3));
-      carveRooms(map, rooms, x, y, w, split, depth + 1);
-      carveRooms(map, rooms, x, y + split, w, h - split, depth + 1);
-    }
-  }
-
-  function connectRooms(map, a, b) {
-    let x = a.cx, y = a.cy;
-    const tx = b.cx, ty = b.cy;
-
-    // L-shaped corridor
-    while (x !== tx) {
-      if (x > 0 && x < MAP_W - 1 && y > 0 && y < MAP_H - 1) {
-        map[y][x] = T.FLOOR;
-      }
-      x += x < tx ? 1 : -1;
-    }
-    while (y !== ty) {
-      if (x > 0 && x < MAP_W - 1 && y > 0 && y < MAP_H - 1) {
-        map[y][x] = T.FLOOR;
-      }
-      y += y < ty ? 1 : -1;
-    }
-  }
-
-  function randomFloorTile(map, avoid) {
-    for (let attempt = 0; attempt < 200; attempt++) {
-      const x = 1 + Math.floor(Math.random() * (MAP_W - 2));
-      const y = 1 + Math.floor(Math.random() * (MAP_H - 2));
-      if (map[y][x] !== T.FLOOR) continue;
-      if (avoid && x === avoid.x && y === avoid.y) continue;
-      if (state.enemies.some(e => e.x === x && e.y === y)) continue;
-      return { x, y };
-    }
-    return null;
+    return shape.map(row =>
+      row.map(cell => cell ? pool[Math.floor(Math.random() * pool.length)] : 0)
+    );
   }
 
   // =====================
-  // CANVAS
+  // CANVAS SIZING
   // =====================
   function sizeCanvas() {
-    const container = $('mapContainer');
-    const cw = container.clientWidth;
-    const ch = container.clientHeight;
+    const wrap = $('boardWrap');
+    const maxW = wrap.clientWidth - 24;
+    const maxH = wrap.clientHeight - 12;
+    const size = Math.min(maxW, maxH);
 
     const dpr = window.devicePixelRatio || 1;
+    cellSize = Math.floor(size / GRID);
+    const canvasSize = cellSize * GRID;
 
-    // Calculate tile size to fit visible area nicely (show ~15x12 tiles)
-    tileSize = Math.max(16, Math.floor(Math.min(cw / 15, ch / 12)));
-
-    viewW = Math.ceil(cw / tileSize) + 2;
-    viewH = Math.ceil(ch / tileSize) + 2;
-
-    canvas.width = cw * dpr;
-    canvas.height = ch * dpr;
-    canvas.style.width = cw + 'px';
-    canvas.style.height = ch + 'px';
+    canvas.width = canvasSize * dpr;
+    canvas.height = canvasSize * dpr;
+    canvas.style.width = canvasSize + 'px';
+    canvas.style.height = canvasSize + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   window.addEventListener('resize', () => {
-    if (gameScreen.classList.contains('active') && state) {
-      sizeCanvas();
-      render();
+    if (gameScreen.classList.contains('active')) {
+      sizeCanvas(); draw();
     }
   });
 
   // =====================
-  // CAMERA
+  // DRAWING
   // =====================
-  function updateCamera() {
-    const cw = parseInt(canvas.style.width);
-    const ch = parseInt(canvas.style.height);
-    cameraX = state.player.x * tileSize - cw / 2 + tileSize / 2;
-    cameraY = state.player.y * tileSize - ch / 2 + tileSize / 2;
-  }
+  function draw() {
+    const size = cellSize * GRID;
+    ctx.clearRect(0, 0, size, size);
 
-  // =====================
-  // RENDERING
-  // =====================
-  function render() {
-    if (!state) return;
-    updateCamera();
+    const gap = 2;
+    const radius = Math.max(3, cellSize * 0.12);
 
-    const cw = parseInt(canvas.style.width);
-    const ch = parseInt(canvas.style.height);
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        const x = c * cellSize + gap;
+        const y = r * cellSize + gap;
+        const w = cellSize - gap * 2;
+        const h = cellSize - gap * 2;
 
-    ctx.fillStyle = TILE_COLORS[T.VOID];
-    ctx.fillRect(0, 0, cw, ch);
+        if (board[r][c]) {
+          // Filled cell with number
+          const nc = getNumColor(board[r][c]);
+          roundRect(x, y, w, h, radius, nc.bg);
 
-    const startCol = Math.max(0, Math.floor(cameraX / tileSize));
-    const startRow = Math.max(0, Math.floor(cameraY / tileSize));
-    const endCol = Math.min(MAP_W, startCol + viewW + 1);
-    const endRow = Math.min(MAP_H, startRow + viewH + 1);
+          // Top shine
+          ctx.fillStyle = 'rgba(255,255,255,0.1)';
+          ctx.fillRect(x + 2, y + 2, w - 4, Math.max(2, h * 0.12));
 
-    // Compute visibility (simple distance-based fog of war)
-    const px = state.player.x;
-    const py = state.player.y;
-    const sightRange = 7;
-
-    // Draw tiles
-    for (let r = startRow; r < endRow; r++) {
-      for (let c = startCol; c < endCol; c++) {
-        const sx = Math.round(c * tileSize - cameraX);
-        const sy = Math.round(r * tileSize - cameraY);
-        const tile = state.map[r][c];
-
-        const dist = Math.sqrt((c - px) ** 2 + (r - py) ** 2);
-        if (dist > sightRange + 2) continue; // not visible at all
-
-        const dimFactor = dist > sightRange ? 0.15 : Math.max(0.3, 1 - dist / (sightRange + 1));
-
-        if (tile === T.WALL) {
-          ctx.fillStyle = lerpColor('#2c3150', '#0a0c14', 1 - dimFactor);
-          ctx.fillRect(sx, sy, tileSize, tileSize);
-          // Top face highlight
-          ctx.fillStyle = `rgba(255,255,255,${0.04 * dimFactor})`;
-          ctx.fillRect(sx, sy, tileSize, 3);
+          // Number text
+          drawNum(board[r][c], x, y, w, h, nc.fg);
         } else {
-          ctx.fillStyle = lerpColor('#1a1e30', '#0a0c14', 1 - dimFactor * 0.8);
-          ctx.fillRect(sx, sy, tileSize, tileSize);
-          // Subtle grid line
-          ctx.fillStyle = `rgba(255,255,255,${0.02 * dimFactor})`;
-          ctx.fillRect(sx, sy, tileSize, 1);
-          ctx.fillRect(sx, sy, 1, tileSize);
-        }
-
-        if (dist > sightRange) continue;
-
-        // Draw items
-        if (tile === T.STAIRS) {
-          drawIcon(sx, sy, '>', STAIRS_COLOR, dimFactor);
-        } else if (tile === T.POTION) {
-          drawIcon(sx, sy, '+', POTION_COLOR, dimFactor);
-        } else if (tile === T.GOLD) {
-          drawIcon(sx, sy, '$', GOLD_COLOR, dimFactor);
+          // Empty cell
+          const shade = (r + c) % 2 === 0 ? '#181b28' : '#1c1f2e';
+          roundRect(x, y, w, h, radius, shade);
         }
       }
     }
 
-    // Draw enemies
-    state.enemies.forEach(e => {
-      const dist = Math.sqrt((e.x - px) ** 2 + (e.y - py) ** 2);
-      if (dist > sightRange) return;
+    // Draw hover preview
+    if (hoverCell && selectedPiece >= 0 && pieces[selectedPiece] && !pieces[selectedPiece].used) {
+      const piece = pieces[selectedPiece];
+      const valid = canPlace(piece, hoverCell.row, hoverCell.col);
 
-      const sx = Math.round(e.x * tileSize - cameraX);
-      const sy = Math.round(e.y * tileSize - cameraY);
-      const dim = Math.max(0.3, 1 - dist / (sightRange + 1));
+      for (let r = 0; r < piece.shape.length; r++) {
+        for (let c = 0; c < piece.shape[r].length; c++) {
+          if (!piece.shape[r][c]) continue;
+          const br = hoverCell.row + r;
+          const bc = hoverCell.col + c;
+          if (br < 0 || br >= GRID || bc < 0 || bc >= GRID) continue;
 
-      // Enemy body
-      ctx.globalAlpha = dim;
-      ctx.fillStyle = e.color;
-      const pad = Math.floor(tileSize * 0.15);
-      ctx.fillRect(sx + pad, sy + pad, tileSize - pad * 2, tileSize - pad * 2);
+          const x = bc * cellSize + gap;
+          const y = br * cellSize + gap;
+          const w = cellSize - gap * 2;
+          const h = cellSize - gap * 2;
 
-      // Icon
-      ctx.fillStyle = '#fff';
-      ctx.font = `bold ${Math.floor(tileSize * 0.5)}px monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(e.icon.toUpperCase(), sx + tileSize / 2, sy + tileSize / 2 + 1);
-
-      // HP bar above
-      if (e.hp < e.maxHp) {
-        const barW = tileSize - 4;
-        const barH = 3;
-        const barX = sx + 2;
-        const barY = sy - 1;
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(barX, barY, barW, barH);
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), barH);
+          if (valid) {
+            const nc = getNumColor(piece.nums[r][c]);
+            ctx.globalAlpha = 0.5;
+            roundRect(x, y, w, h, radius, nc.bg);
+            drawNum(piece.nums[r][c], x, y, w, h, nc.fg);
+            ctx.globalAlpha = 1;
+          } else {
+            ctx.globalAlpha = 0.25;
+            roundRect(x, y, w, h, radius, '#ef4444');
+            ctx.globalAlpha = 1;
+          }
+        }
       }
-      ctx.globalAlpha = 1;
-    });
-
-    // Draw player
-    {
-      const sx = Math.round(px * tileSize - cameraX);
-      const sy = Math.round(py * tileSize - cameraY);
-
-      // Glow
-      ctx.fillStyle = 'rgba(192, 132, 252, 0.15)';
-      const glow = tileSize * 0.4;
-      ctx.fillRect(sx - glow, sy - glow, tileSize + glow * 2, tileSize + glow * 2);
-
-      // Body
-      ctx.fillStyle = PLAYER_COLOR;
-      const pad = Math.floor(tileSize * 0.1);
-      ctx.fillRect(sx + pad, sy + pad, tileSize - pad * 2, tileSize - pad * 2);
-
-      // Face
-      ctx.fillStyle = '#fff';
-      ctx.font = `bold ${Math.floor(tileSize * 0.5)}px monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('@', sx + tileSize / 2, sy + tileSize / 2 + 1);
     }
   }
 
-  function drawIcon(sx, sy, char, color, dim) {
-    ctx.globalAlpha = dim;
+  function roundRect(x, y, w, h, r, fill) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+  }
+
+  function drawNum(num, x, y, w, h, color) {
+    const str = String(num);
+    let fontSize;
+    if (str.length <= 2) fontSize = cellSize * 0.42;
+    else if (str.length === 3) fontSize = cellSize * 0.34;
+    else fontSize = cellSize * 0.26;
+
     ctx.fillStyle = color;
-    ctx.font = `bold ${Math.floor(tileSize * 0.55)}px monospace`;
+    ctx.font = `800 ${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(char, sx + tileSize / 2, sy + tileSize / 2 + 1);
-    ctx.globalAlpha = 1;
+    ctx.fillText(str, x + w / 2, y + h / 2 + 1);
   }
 
-  function lerpColor(a, b, t) {
-    const ah = parseInt(a.slice(1), 16);
-    const bh = parseInt(b.slice(1), 16);
-    const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
-    const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
-    const rr = Math.round(ar + (br - ar) * t);
-    const rg = Math.round(ag + (bg - ag) * t);
-    const rb = Math.round(ab + (bb - ab) * t);
-    return `rgb(${rr},${rg},${rb})`;
+  // =====================
+  // TRAY
+  // =====================
+  function renderTray() {
+    tray.innerHTML = '';
+
+    pieces.forEach((piece, idx) => {
+      const slot = document.createElement('div');
+      slot.className = 'piece-slot' + (piece.used ? ' used' : '') + (idx === selectedPiece ? ' selected' : '');
+
+      const miniSize = Math.min(18, Math.floor(65 / Math.max(piece.shape.length, piece.shape[0].length)));
+      const pcW = piece.shape[0].length * miniSize;
+      const pcH = piece.shape.length * miniSize;
+
+      const pc = document.createElement('canvas');
+      pc.className = 'piece-canvas';
+      pc.width = pcW * 2;
+      pc.height = pcH * 2;
+      pc.style.width = pcW + 'px';
+      pc.style.height = pcH + 'px';
+
+      const pctx = pc.getContext('2d');
+      pctx.setTransform(2, 0, 0, 2, 0, 0);
+
+      for (let r = 0; r < piece.shape.length; r++) {
+        for (let c = 0; c < piece.shape[r].length; c++) {
+          if (!piece.shape[r][c]) continue;
+          const num = piece.nums[r][c];
+          const nc = getNumColor(num);
+          const mg = 1;
+          const bx = c * miniSize + mg;
+          const by = r * miniSize + mg;
+          const bw = miniSize - mg * 2;
+          const bh = miniSize - mg * 2;
+
+          pctx.fillStyle = nc.bg;
+          pctx.beginPath();
+          const rr = 2;
+          pctx.moveTo(bx + rr, by);
+          pctx.lineTo(bx + bw - rr, by);
+          pctx.quadraticCurveTo(bx + bw, by, bx + bw, by + rr);
+          pctx.lineTo(bx + bw, by + bh - rr);
+          pctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - rr, by + bh);
+          pctx.lineTo(bx + rr, by + bh);
+          pctx.quadraticCurveTo(bx, by + bh, bx, by + bh - rr);
+          pctx.lineTo(bx, by + rr);
+          pctx.quadraticCurveTo(bx, by, bx + rr, by);
+          pctx.closePath();
+          pctx.fill();
+
+          // Mini number
+          const fs = miniSize * 0.45;
+          pctx.fillStyle = nc.fg;
+          pctx.font = `800 ${fs}px sans-serif`;
+          pctx.textAlign = 'center';
+          pctx.textBaseline = 'middle';
+          pctx.fillText(String(num), bx + bw / 2, by + bh / 2 + 0.5);
+        }
+      }
+
+      slot.appendChild(pc);
+      slot.addEventListener('pointerdown', () => {
+        if (piece.used || animating) return;
+        selectedPiece = selectedPiece === idx ? -1 : idx;
+        renderTray();
+        draw();
+      });
+
+      tray.appendChild(slot);
+    });
   }
 
   // =====================
   // INPUT
   // =====================
-  function onKey(e) {
-    if (!gameScreen.classList.contains('active')) return;
-    if (menuOverlay.classList.contains('active') || deathOverlay.classList.contains('active')) return;
-
-    const keyMap = {
-      ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-      w: 'up', s: 'down', a: 'left', d: 'right',
-      ' ': 'wait',
-    };
-    const dir = keyMap[e.key];
-    if (dir) {
-      e.preventDefault();
-      handleDirection(dir);
-    }
-  }
-
-  function handleTap(e) {
-    if (!state) return;
+  function getCell(e) {
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    const tx = Math.floor((mx + cameraX) / tileSize);
-    const ty = Math.floor((my + cameraY) / tileSize);
-
-    const dx = tx - state.player.x;
-    const dy = ty - state.player.y;
-
-    if (dx === 0 && dy === 0) {
-      handleDirection('wait');
-    } else if (Math.abs(dx) >= Math.abs(dy)) {
-      handleDirection(dx > 0 ? 'right' : 'left');
-    } else {
-      handleDirection(dy > 0 ? 'down' : 'up');
-    }
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const col = Math.floor(x / cellSize);
+    const row = Math.floor(y / cellSize);
+    if (row < 0 || row >= GRID || col < 0 || col >= GRID) return null;
+    return { row, col };
   }
 
-  function handleDirection(dir) {
-    if (!state || !gameScreen.classList.contains('active')) return;
-    if (menuOverlay.classList.contains('active') || deathOverlay.classList.contains('active')) return;
+  function onMove(e) {
+    if (animating) return;
+    const cell = getCell(e);
+    // Adjust hover to center the piece
+    if (cell && selectedPiece >= 0 && pieces[selectedPiece]) {
+      const p = pieces[selectedPiece];
+      cell.row -= Math.floor(p.shape.length / 2);
+      cell.col -= Math.floor(p.shape[0].length / 2);
+    }
+    hoverCell = cell;
+    draw();
+  }
 
-    let dx = 0, dy = 0;
-    if (dir === 'up') dy = -1;
-    else if (dir === 'down') dy = 1;
-    else if (dir === 'left') dx = -1;
-    else if (dir === 'right') dx = 1;
-    // 'wait' = dx,dy = 0,0
+  function onDown(e) {
+    if (animating) return;
+    const cell = getCell(e);
+    if (!cell) return;
 
-    playerTurn(dx, dy);
+    if (selectedPiece >= 0) {
+      const p = pieces[selectedPiece];
+      // Center the piece on tap
+      const adjRow = cell.row - Math.floor(p.shape.length / 2);
+      const adjCol = cell.col - Math.floor(p.shape[0].length / 2);
+      hoverCell = { row: adjRow, col: adjCol };
+      tryPlace();
+    }
   }
 
   // =====================
-  // GAME LOGIC
+  // PLACEMENT
   // =====================
-  function playerTurn(dx, dy) {
-    const p = state.player;
-    const nx = p.x + dx;
-    const ny = p.y + dy;
-
-    if (dx === 0 && dy === 0) {
-      // Wait — just let enemies move
-      enemiesTurn();
-      render();
-      saveGame();
-      return;
+  function canPlace(piece, startRow, startCol) {
+    for (let r = 0; r < piece.shape.length; r++) {
+      for (let c = 0; c < piece.shape[r].length; c++) {
+        if (!piece.shape[r][c]) continue;
+        const br = startRow + r;
+        const bc = startCol + c;
+        if (br < 0 || br >= GRID || bc < 0 || bc >= GRID) return false;
+        if (board[br][bc] !== 0) return false;
+      }
     }
-
-    // Bounds check
-    if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) return;
-
-    // Wall check
-    if (state.map[ny][nx] === T.WALL) return;
-
-    // Enemy check — attack if there
-    const enemy = state.enemies.find(e => e.x === nx && e.y === ny);
-    if (enemy) {
-      attackEnemy(enemy);
-      enemiesTurn();
-      render();
-      checkDeath();
-      saveGame();
-      return;
-    }
-
-    // Move player
-    p.x = nx;
-    p.y = ny;
-
-    // Pick up items
-    const tile = state.map[ny][nx];
-    if (tile === T.POTION) {
-      const heal = 5 + Math.floor(state.floor * 1.5);
-      p.hp = Math.min(p.maxHp, p.hp + heal);
-      state.map[ny][nx] = T.FLOOR;
-      log(`Healed ${heal} HP!`, 'heal');
-    } else if (tile === T.GOLD) {
-      const amount = 3 + Math.floor(Math.random() * 5) + state.floor;
-      state.gold += amount;
-      state.map[ny][nx] = T.FLOOR;
-      log(`Found ${amount} gold!`, 'gold');
-    } else if (tile === T.STAIRS) {
-      descend();
-      return;
-    }
-
-    // Enemies move
-    enemiesTurn();
-    updateHUD();
-    render();
-    checkDeath();
-    saveGame();
+    return true;
   }
 
-  function attackEnemy(enemy) {
-    const p = state.player;
-    const dmg = p.atk + Math.floor(Math.random() * 2);
-    enemy.hp -= dmg;
-
-    if (enemy.hp <= 0) {
-      state.enemies = state.enemies.filter(e => e !== enemy);
-      state.kills++;
-      state.gold += enemy.xpGold;
-
-      // Level up: every 5 kills boost stats
-      if (state.kills % 5 === 0) {
-        p.atk += 1;
-        p.maxHp += 3;
-        p.hp = Math.min(p.maxHp, p.hp + 5);
-        log(`Level up! ATK ${p.atk}, MaxHP ${p.maxHp}`, 'flash');
-      } else {
-        log(`Slain ${enemy.name}! +${enemy.xpGold}g`, 'gold');
+  function canPlaceAnywhere(piece) {
+    for (let r = 0; r <= GRID - piece.shape.length; r++) {
+      for (let c = 0; c <= GRID - piece.shape[0].length; c++) {
+        if (canPlace(piece, r, c)) return true;
       }
-    } else {
-      log(`Hit ${enemy.name} for ${dmg} (${enemy.hp}HP left)`, 'flash');
     }
-    updateHUD();
+    return false;
   }
 
-  function enemiesTurn() {
-    const p = state.player;
+  function tryPlace() {
+    if (selectedPiece < 0 || !hoverCell || animating) return;
+    const piece = pieces[selectedPiece];
+    if (piece.used) return;
+    if (!canPlace(piece, hoverCell.row, hoverCell.col)) return;
 
-    state.enemies.forEach(enemy => {
-      const dist = Math.abs(enemy.x - p.x) + Math.abs(enemy.y - p.y);
-
-      // Only chase if within range
-      if (dist > 8) return;
-
-      // Simple chase AI
-      let dx = 0, dy = 0;
-      if (Math.random() < 0.8) {
-        // Move toward player
-        const xDiff = p.x - enemy.x;
-        const yDiff = p.y - enemy.y;
-
-        if (Math.abs(xDiff) > Math.abs(yDiff)) {
-          dx = xDiff > 0 ? 1 : -1;
-        } else {
-          dy = yDiff > 0 ? 1 : -1;
-        }
-      } else {
-        // Random move
-        const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-        [dx, dy] = dirs[Math.floor(Math.random() * 4)];
+    // Place the piece on the board
+    let cellsPlaced = 0;
+    for (let r = 0; r < piece.shape.length; r++) {
+      for (let c = 0; c < piece.shape[r].length; c++) {
+        if (!piece.shape[r][c]) continue;
+        board[hoverCell.row + r][hoverCell.col + c] = piece.nums[r][c];
+        cellsPlaced++;
       }
+    }
+    score += cellsPlaced;
 
-      const nx = enemy.x + dx;
-      const ny = enemy.y + dy;
+    piece.used = true;
+    selectedPiece = -1;
+    hoverCell = null;
 
-      // Attack player if adjacent
-      if (nx === p.x && ny === p.y) {
-        const dmg = enemy.atk + Math.floor(Math.random() * 2);
-        p.hp -= dmg;
-        log(`${enemy.name} hits you for ${dmg}!`, 'damage');
-        updateHUD();
+    // Start merge + clear chain
+    animating = true;
+    renderTray();
+    draw();
+
+    setTimeout(() => runChain(), 150);
+  }
+
+  // =====================
+  // MERGE + CLEAR CHAIN
+  // =====================
+  function runChain() {
+    let totalMerges = 0;
+    let totalClears = 0;
+    let chainStep = 0;
+
+    function step() {
+      // Phase 1: Merge adjacent same numbers
+      const mergeCount = doMerges();
+      totalMerges += mergeCount;
+
+      if (mergeCount > 0) {
+        score += mergeCount * 10 * (chainStep + 1);
+        draw();
+        chainStep++;
+        // Continue merging after a short delay
+        setTimeout(step, 200);
         return;
       }
 
-      // Move if valid and no collision
-      if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) return;
-      if (state.map[ny][nx] === T.WALL || state.map[ny][nx] === T.STAIRS) return;
-      if (state.enemies.some(e => e !== enemy && e.x === nx && e.y === ny)) return;
-      if (nx === p.x && ny === p.y) return;
+      // Phase 2: Clear full rows/columns
+      const cleared = doClear();
+      totalClears += cleared;
 
-      enemy.x = nx;
-      enemy.y = ny;
-    });
-  }
+      if (cleared > 0) {
+        score += cleared * GRID * 2;
+        draw();
+        // After clearing, check for new merges
+        setTimeout(step, 250);
+        return;
+      }
 
-  function descend() {
-    state.floor++;
+      // Chain complete
+      if (totalMerges > 0 || totalClears > 0) {
+        if (totalMerges >= 3) showPopup('CHAIN!', 'merge-pop');
+        else if (totalClears >= 2) showPopup('COMBO!', 'clear-pop');
+      }
 
-    // Boost player slightly on descent
-    state.player.maxHp += 2;
-    state.player.hp = Math.min(state.player.maxHp, state.player.hp + 8);
-    state.player.atk += 1;
+      // Check if all 3 used → new set
+      if (pieces.every(p => p.used)) {
+        pieces = genPieces();
+      }
 
-    generateFloor();
-    updateHUD();
-    log(`Descended to Floor ${state.floor}`, 'flash');
-    render();
-    saveGame();
-  }
-
-  function checkDeath() {
-    if (state.player.hp <= 0) {
-      state.player.hp = 0;
+      animating = false;
       updateHUD();
-      setTimeout(showDeath, 500);
+      renderTray();
+      draw();
+      save();
+
+      // Check game over
+      if (isGameOver()) {
+        setTimeout(showGameOver, 400);
+      }
     }
+
+    step();
+  }
+
+  // Merge: find adjacent pairs with same number, merge them
+  // Returns number of merges performed in this pass
+  function doMerges() {
+    let merges = 0;
+
+    // Scan bottom-right to top-left so merges "settle" naturally
+    // But actually, scan all and collect merge targets, then apply
+    const merged = Array.from({ length: GRID }, () => Array(GRID).fill(false));
+
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        if (!board[r][c] || merged[r][c]) continue;
+        const val = board[r][c];
+
+        // Check right neighbor
+        if (c + 1 < GRID && board[r][c + 1] === val && !merged[r][c + 1]) {
+          board[r][c + 1] = val * 2;
+          board[r][c] = 0;
+          merged[r][c + 1] = true;
+          merges++;
+          continue; // This cell is now empty, move on
+        }
+
+        // Check bottom neighbor
+        if (r + 1 < GRID && board[r + 1][c] === val && !merged[r + 1][c]) {
+          board[r + 1][c] = val * 2;
+          board[r][c] = 0;
+          merged[r + 1][c] = true;
+          merges++;
+        }
+      }
+    }
+
+    return merges;
+  }
+
+  // Clear full rows and columns
+  function doClear() {
+    const rowsToClear = [];
+    const colsToClear = [];
+
+    for (let r = 0; r < GRID; r++) {
+      if (board[r].every(cell => cell !== 0)) rowsToClear.push(r);
+    }
+    for (let c = 0; c < GRID; c++) {
+      let full = true;
+      for (let r = 0; r < GRID; r++) {
+        if (!board[r][c]) { full = false; break; }
+      }
+      if (full) colsToClear.push(c);
+    }
+
+    rowsToClear.forEach(r => {
+      for (let c = 0; c < GRID; c++) board[r][c] = 0;
+    });
+    colsToClear.forEach(c => {
+      for (let r = 0; r < GRID; r++) board[r][c] = 0;
+    });
+
+    return rowsToClear.length + colsToClear.length;
+  }
+
+  // =====================
+  // GAME OVER
+  // =====================
+  function isGameOver() {
+    for (const piece of pieces) {
+      if (piece.used) continue;
+      if (canPlaceAnywhere(piece)) return false;
+    }
+    return true;
+  }
+
+  function showGameOver() {
+    $('overScore').textContent = score.toLocaleString();
+
+    const oldBest = parseInt(localStorage.getItem(BEST_KEY)) || 0;
+    const isNew = score > oldBest;
+    if (isNew) {
+      best = score;
+      localStorage.setItem(BEST_KEY, best);
+    }
+    $('overBest').textContent = isNew ? 'New High Score!' : (oldBest > 0 ? `Best: ${oldBest.toLocaleString()}` : '');
+
+    // Find highest number on board
+    let highest = 0;
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        if (board[r][c] > highest) highest = board[r][c];
+      }
+    }
+    $('overHighest').textContent = highest > 0 ? `Highest tile: ${highest}` : '';
+
+    localStorage.removeItem(SAVE_KEY);
+    overOverlay.classList.add('active');
+  }
+
+  // =====================
+  // POPUP
+  // =====================
+  function showPopup(text, cls) {
+    popup.textContent = text;
+    popup.className = 'popup show ' + cls;
+    setTimeout(() => popup.classList.remove('show'), 1000);
   }
 
   // =====================
   // HUD
   // =====================
   function updateHUD() {
-    const p = state.player;
-    $('hpBar').style.width = (p.hp / p.maxHp * 100) + '%';
-    $('hpText').textContent = `${p.hp}/${p.maxHp}`;
-    $('atkText').textContent = p.atk;
-    $('goldText').textContent = state.gold;
-    $('floorText').textContent = `F${state.floor}`;
-  }
-
-  // =====================
-  // LOG
-  // =====================
-  function log(text, type) {
-    const el = $('logText');
-    el.textContent = text;
-    el.className = 'log-text' + (type ? ` ${type}` : '');
+    $('scoreVal').textContent = score.toLocaleString();
+    $('bestVal').textContent = Math.max(best, score).toLocaleString();
   }
 
   // =====================
   // SAVE / LOAD
   // =====================
-  function saveGame() {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-  }
-
-  function loadBest() {
-    return JSON.parse(localStorage.getItem(BEST_KEY) || '{"floor":0,"gold":0,"kills":0}');
-  }
-
-  function saveBest(data) {
-    localStorage.setItem(BEST_KEY, JSON.stringify(data));
+  function save() {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ board, score, pieces }));
   }
 
   // =====================
