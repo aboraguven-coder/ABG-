@@ -12,6 +12,167 @@
   const GRID = 8;
   const SAVE_KEY = 'numdrop_save';
   const BEST_KEY = 'numdrop_best';
+  const SOUND_KEY = 'numdrop_sound';
+
+  // =====================
+  // AUDIO ENGINE (Web Audio API — no files needed)
+  // =====================
+  let audioCtx = null;
+  let soundOn = true;
+  let musicGain = null;
+  let musicPlaying = false;
+
+  function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    soundOn = localStorage.getItem(SOUND_KEY) !== 'off';
+  }
+
+  // --- SFX ---
+  function playTone(freq, duration, type, volume, ramp) {
+    if (!audioCtx || !soundOn) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    if (ramp) osc.frequency.linearRampToValueAtTime(ramp, audioCtx.currentTime + duration);
+    gain.gain.setValueAtTime(volume || 0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  }
+
+  function sfxSelect() {
+    playTone(600, 0.08, 'sine', 0.12);
+    playTone(900, 0.06, 'sine', 0.08);
+  }
+
+  function sfxPlace() {
+    playTone(200, 0.12, 'triangle', 0.2);
+    playTone(300, 0.08, 'sine', 0.1);
+  }
+
+  function sfxMerge(chain) {
+    // Ascending pitch based on chain depth
+    const base = 400 + chain * 100;
+    playTone(base, 0.15, 'sine', 0.18);
+    setTimeout(() => playTone(base * 1.25, 0.12, 'sine', 0.14), 60);
+    setTimeout(() => playTone(base * 1.5, 0.1, 'sine', 0.1), 120);
+  }
+
+  function sfxClear(count) {
+    // Satisfying sweep
+    playTone(300, 0.25, 'sawtooth', 0.08, 800);
+    setTimeout(() => playTone(500, 0.2, 'sine', 0.12), 80);
+    if (count >= 2) {
+      setTimeout(() => playTone(700, 0.2, 'sine', 0.1), 160);
+      setTimeout(() => playTone(900, 0.15, 'triangle', 0.08), 240);
+    }
+  }
+
+  function sfxCombo() {
+    // Big fanfare
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((n, i) => {
+      setTimeout(() => playTone(n, 0.2, 'sine', 0.12), i * 80);
+    });
+  }
+
+  function sfxGameOver() {
+    playTone(400, 0.3, 'sine', 0.15, 150);
+    setTimeout(() => playTone(300, 0.3, 'sine', 0.12, 100), 200);
+    setTimeout(() => playTone(200, 0.5, 'triangle', 0.1, 80), 400);
+  }
+
+  function sfxDragStart() {
+    playTone(500, 0.05, 'sine', 0.08);
+  }
+
+  function sfxInvalidDrop() {
+    playTone(200, 0.1, 'square', 0.06);
+    setTimeout(() => playTone(150, 0.1, 'square', 0.05), 80);
+  }
+
+  // --- BACKGROUND MUSIC ---
+  // Simple ambient loop: soft chord progression
+  function startMusic() {
+    if (!audioCtx || musicPlaying || !soundOn) return;
+    musicPlaying = true;
+
+    musicGain = audioCtx.createGain();
+    musicGain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+    musicGain.connect(audioCtx.destination);
+
+    // Chord progression: Am → F → C → G (classic chill loop)
+    const chords = [
+      [220, 261.6, 329.6],   // Am
+      [174.6, 220, 261.6],   // F
+      [261.6, 329.6, 392],   // C
+      [196, 246.9, 293.7],   // G
+    ];
+
+    let chordIdx = 0;
+    let activeOscs = [];
+
+    function playChord() {
+      if (!soundOn || !musicPlaying) return;
+
+      // Fade out old
+      activeOscs.forEach(o => {
+        try { o.gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5); } catch(e) {}
+      });
+      setTimeout(() => {
+        activeOscs.forEach(o => { try { o.osc.stop(); } catch(e) {} });
+        activeOscs = [];
+      }, 600);
+
+      const chord = chords[chordIdx % chords.length];
+      chord.forEach(freq => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.8);
+        gain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 2.5);
+        gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 3.8);
+        osc.connect(gain);
+        gain.connect(musicGain);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 4.0);
+        activeOscs.push({ osc, gain });
+      });
+
+      chordIdx++;
+    }
+
+    playChord();
+    window._musicInterval = setInterval(playChord, 3800);
+  }
+
+  function stopMusic() {
+    musicPlaying = false;
+    if (window._musicInterval) {
+      clearInterval(window._musicInterval);
+      window._musicInterval = null;
+    }
+  }
+
+  function toggleSound() {
+    initAudio();
+    soundOn = !soundOn;
+    localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off');
+    const btn = $('btnSound');
+    btn.classList.toggle('muted', !soundOn);
+    if (soundOn) {
+      startMusic();
+      sfxSelect();
+    } else {
+      stopMusic();
+    }
+  }
 
   // Number → color mapping (vibrant & colorful)
   const NUM_COLORS = {
@@ -96,11 +257,28 @@
     ctx = canvas.getContext('2d');
     best = parseInt(localStorage.getItem(BEST_KEY)) || 0;
 
+    // Sound button
+    $('btnSound').onclick = toggleSound;
+    // Restore muted state
+    if (localStorage.getItem(SOUND_KEY) === 'off') {
+      soundOn = false;
+      $('btnSound').classList.add('muted');
+    }
+
+    // Init audio on first user interaction (required by browsers)
+    const startAudioOnce = () => {
+      initAudio();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      if (soundOn) startMusic();
+      document.removeEventListener('pointerdown', startAudioOnce);
+    };
+    document.addEventListener('pointerdown', startAudioOnce);
+
     // Buttons
     $('btnNewGame').onclick = startNew;
     $('btnContinue').onclick = loadAndResume;
-    $('btnPause').onclick = () => pauseOverlay.classList.add('active');
-    $('btnResume').onclick = () => pauseOverlay.classList.remove('active');
+    $('btnPause').onclick = () => { pauseOverlay.classList.add('active'); stopMusic(); };
+    $('btnResume').onclick = () => { pauseOverlay.classList.remove('active'); if (soundOn) startMusic(); };
     $('btnRestartP').onclick = () => { pauseOverlay.classList.remove('active'); startNew(); };
     $('btnHomeP').onclick = () => { pauseOverlay.classList.remove('active'); goHome(); };
     $('btnRetry').onclick = () => { overOverlay.classList.remove('active'); startNew(); };
@@ -140,6 +318,7 @@
   }
 
   function goHome() {
+    stopMusic();
     showScreen(titleScreen);
     updateTitleScreen();
   }
@@ -169,6 +348,7 @@
     renderTray();
     draw();
     save();
+    if (soundOn) startMusic();
   }
 
   function loadAndResume() {
@@ -186,6 +366,7 @@
     updateHUD();
     renderTray();
     draw();
+    if (soundOn) startMusic();
   }
 
   // =====================
@@ -449,6 +630,7 @@
     renderTray();
     draw();
     haptic(5);
+    sfxDragStart();
   }
 
   function onGlobalMove(e) {
@@ -475,6 +657,7 @@
     } else {
       // Invalid drop — snap back
       haptic(10);
+      sfxInvalidDrop();
     }
 
     // Clean up drag
@@ -573,6 +756,7 @@
     hoverCell = null;
 
     haptic(15);
+    sfxPlace();
 
     // Start merge + clear chain
     animating = true;
@@ -601,6 +785,7 @@
         score += pts;
         showScorePop('+' + pts);
         haptic(20);
+        sfxMerge(chainStep);
         updateHUD();
         draw();
         chainStep++;
@@ -617,6 +802,7 @@
         score += pts;
         showScorePop('+' + pts);
         haptic(30);
+        sfxClear(cleared);
         updateHUD();
         draw();
         setTimeout(step, 260);
@@ -624,8 +810,8 @@
       }
 
       // Chain complete
-      if (totalMerges >= 3) showPopup('CHAIN!', 'merge-pop');
-      else if (totalClears >= 2) showPopup('COMBO!', 'clear-pop');
+      if (totalMerges >= 3) { showPopup('CHAIN!', 'merge-pop'); sfxCombo(); }
+      else if (totalClears >= 2) { showPopup('COMBO!', 'clear-pop'); sfxCombo(); }
 
       // Check if all 3 used → new set
       if (pieces.every(p => p.used)) {
@@ -712,7 +898,9 @@
   }
 
   function showGameOver() {
+    stopMusic();
     haptic(50);
+    sfxGameOver();
     $('overScore').textContent = score.toLocaleString();
 
     const oldBest = parseInt(localStorage.getItem(BEST_KEY)) || 0;

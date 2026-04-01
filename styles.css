@@ -130,6 +130,12 @@ body {
 }
 .icon-btn:active { transform: scale(0.92); }
 
+.sound-btn { font-size: 18px; letter-spacing: 0; }
+.sound-btn.muted {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+
 /* ===== GAME TOP ===== */
 .game-top {
   display: flex; align-items: center; gap: 12px;
