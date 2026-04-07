@@ -14,6 +14,9 @@
   const BEST_KEY = 'numdrop_best';
   const SOUND_KEY = 'numdrop_sound';
 
+  // Starting power-up counts
+  const PU_START = { trash: 3, reshuffle: 2, hammer: 2, bomb: 1 };
+
   // =====================
   // AUDIO ENGINE (Web Audio API — no files needed)
   // =====================
@@ -44,55 +47,10 @@
     osc.stop(audioCtx.currentTime + duration);
   }
 
-  function sfxSelect() {
-    playTone(600, 0.08, 'sine', 0.12);
-    playTone(900, 0.06, 'sine', 0.08);
-  }
-
+  // Only the place/crash sound — user removed others, music plays instead
   function sfxPlace() {
-    playTone(200, 0.12, 'triangle', 0.2);
-    playTone(300, 0.08, 'sine', 0.1);
-  }
-
-  function sfxMerge(chain) {
-    // Ascending pitch based on chain depth
-    const base = 400 + chain * 100;
-    playTone(base, 0.15, 'sine', 0.18);
-    setTimeout(() => playTone(base * 1.25, 0.12, 'sine', 0.14), 60);
-    setTimeout(() => playTone(base * 1.5, 0.1, 'sine', 0.1), 120);
-  }
-
-  function sfxClear(count) {
-    // Satisfying sweep
-    playTone(300, 0.25, 'sawtooth', 0.08, 800);
-    setTimeout(() => playTone(500, 0.2, 'sine', 0.12), 80);
-    if (count >= 2) {
-      setTimeout(() => playTone(700, 0.2, 'sine', 0.1), 160);
-      setTimeout(() => playTone(900, 0.15, 'triangle', 0.08), 240);
-    }
-  }
-
-  function sfxCombo() {
-    // Big fanfare
-    const notes = [523, 659, 784, 1047];
-    notes.forEach((n, i) => {
-      setTimeout(() => playTone(n, 0.2, 'sine', 0.12), i * 80);
-    });
-  }
-
-  function sfxGameOver() {
-    playTone(400, 0.3, 'sine', 0.15, 150);
-    setTimeout(() => playTone(300, 0.3, 'sine', 0.12, 100), 200);
-    setTimeout(() => playTone(200, 0.5, 'triangle', 0.1, 80), 400);
-  }
-
-  function sfxDragStart() {
-    playTone(500, 0.05, 'sine', 0.08);
-  }
-
-  function sfxInvalidDrop() {
-    playTone(200, 0.1, 'square', 0.06);
-    setTimeout(() => playTone(150, 0.1, 'square', 0.05), 80);
+    playTone(180, 0.14, 'triangle', 0.22);
+    playTone(280, 0.1, 'sine', 0.12);
   }
 
   // --- BACKGROUND MUSIC ---
@@ -168,7 +126,6 @@
     btn.classList.toggle('muted', !soundOn);
     if (soundOn) {
       startMusic();
-      sfxSelect();
     } else {
       stopMusic();
     }
@@ -233,7 +190,13 @@
 
   // Canvas
   let canvas, ctx;
+  let fxCanvas, fxCtx;
   let cellSize = 0;
+
+  // Power-ups
+  let powerups = { ...PU_START };
+  let activePU = null;       // current power-up mode: 'trash' | 'hammer' | null
+  let currentStreak = 0;     // dynamic background level based on chain streaks
 
   // =====================
   // DOM
@@ -255,6 +218,8 @@
   function init() {
     canvas = $('boardCanvas');
     ctx = canvas.getContext('2d');
+    fxCanvas = $('effectsCanvas');
+    fxCtx = fxCanvas.getContext('2d');
     best = parseInt(localStorage.getItem(BEST_KEY)) || 0;
 
     // Sound button
@@ -283,6 +248,13 @@
     $('btnHomeP').onclick = () => { pauseOverlay.classList.remove('active'); goHome(); };
     $('btnRetry').onclick = () => { overOverlay.classList.remove('active'); startNew(); };
     $('btnHomeO').onclick = () => { overOverlay.classList.remove('active'); goHome(); };
+
+    // Power-up buttons
+    $('puTrash').onclick     = () => togglePU('trash');
+    $('puReshuffle').onclick = () => usePU('reshuffle');
+    $('puHammer').onclick    = () => togglePU('hammer');
+    $('puBomb').onclick      = () => usePU('bomb');
+    $('hammerCancel').onclick = () => setActivePU(null);
 
     // Global pointer events for drag
     document.addEventListener('pointermove', onGlobalMove, { passive: false });
@@ -319,6 +291,9 @@
 
   function goHome() {
     stopMusic();
+    currentStreak = 0;
+    updateStreakClass();
+    setActivePU(null);
     showScreen(titleScreen);
     updateTitleScreen();
   }
@@ -341,11 +316,16 @@
     dragging = false;
     dragIndex = -1;
     pieces = genPieces();
+    powerups = { ...PU_START };
+    setActivePU(null);
+    currentStreak = 0;
+    updateStreakClass();
 
     showScreen(gameScreen);
     sizeCanvas();
     updateHUD();
     renderTray();
+    renderPowerups();
     draw();
     save();
     if (soundOn) startMusic();
@@ -357,14 +337,19 @@
     board = data.board;
     score = data.score;
     pieces = data.pieces;
+    powerups = Object.assign({ ...PU_START }, data.powerups || {});
     selectedPiece = -1;
     hoverCell = null;
     animating = false;
+    setActivePU(null);
+    currentStreak = 0;
+    updateStreakClass();
 
     showScreen(gameScreen);
     sizeCanvas();
     updateHUD();
     renderTray();
+    renderPowerups();
     draw();
     if (soundOn) startMusic();
   }
@@ -412,6 +397,19 @@
     canvas.style.width = canvasSize + 'px';
     canvas.style.height = canvasSize + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Effects canvas mirrors the board canvas
+    fxCanvas.width = canvasSize * dpr;
+    fxCanvas.height = canvasSize * dpr;
+    fxCanvas.style.width = canvasSize + 'px';
+    fxCanvas.style.height = canvasSize + 'px';
+    fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Position effects canvas on top of board canvas
+    const boardRect = canvas.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    fxCanvas.style.left = (boardRect.left - wrapRect.left) + 'px';
+    fxCanvas.style.top  = (boardRect.top  - wrapRect.top)  + 'px';
   }
 
   window.addEventListener('resize', () => {
@@ -526,16 +524,22 @@
       slot.className = 'piece-slot'
         + (piece.used ? ' used' : '')
         + (idx === selectedPiece ? ' selected' : '')
-        + (dragging && idx === dragIndex ? ' dragging' : '');
+        + (dragging && idx === dragIndex ? ' dragging' : '')
+        + (activePU === 'trash' && !piece.used ? ' trash-target' : '');
 
       const miniSize = Math.min(22, Math.floor(75 / Math.max(piece.shape.length, piece.shape[0].length)));
       const pcCanvas = createPieceCanvas(piece, miniSize);
 
       slot.appendChild(pcCanvas);
 
-      // Start drag on pointerdown
+      // Start drag on pointerdown — unless trash mode (then tap to delete)
       slot.addEventListener('pointerdown', (e) => {
         if (piece.used || animating) return;
+        if (activePU === 'trash') {
+          e.preventDefault();
+          trashPiece(idx);
+          return;
+        }
         e.preventDefault();
         startDrag(idx, e);
       });
@@ -630,7 +634,6 @@
     renderTray();
     draw();
     haptic(5);
-    sfxDragStart();
   }
 
   function onGlobalMove(e) {
@@ -657,7 +660,6 @@
     } else {
       // Invalid drop — snap back
       haptic(10);
-      sfxInvalidDrop();
     }
 
     // Clean up drag
@@ -692,6 +694,17 @@
   // =====================
   function onBoardTap(e) {
     if (animating || dragging) return;
+
+    // Hammer mode — tap a cell to remove it
+    if (activePU === 'hammer') {
+      const rect = canvas.getBoundingClientRect();
+      const col = Math.floor((e.clientX - rect.left) / cellSize);
+      const row = Math.floor((e.clientY - rect.top)  / cellSize);
+      if (row >= 0 && row < GRID && col >= 0 && col < GRID && board[row][col]) {
+        useHammer(row, col);
+      }
+      return;
+    }
 
     // If no piece selected, ignore
     if (selectedPiece < 0) return;
@@ -785,7 +798,8 @@
         score += pts;
         showScorePop('+' + pts);
         haptic(20);
-        sfxMerge(chainStep);
+        currentStreak++;
+        updateStreakClass();
         updateHUD();
         draw();
         chainStep++;
@@ -802,7 +816,8 @@
         score += pts;
         showScorePop('+' + pts);
         haptic(30);
-        sfxClear(cleared);
+        currentStreak++;
+        updateStreakClass();
         updateHUD();
         draw();
         setTimeout(step, 260);
@@ -810,8 +825,14 @@
       }
 
       // Chain complete
-      if (totalMerges >= 3) { showPopup('CHAIN!', 'merge-pop'); sfxCombo(); }
-      else if (totalClears >= 2) { showPopup('COMBO!', 'clear-pop'); sfxCombo(); }
+      if (totalMerges >= 3) { showPopup('CHAIN!', 'merge-pop'); }
+      else if (totalClears >= 2) { showPopup('COMBO!', 'clear-pop'); }
+
+      // Decay streak when nothing happens this placement
+      if (totalMerges === 0 && totalClears === 0) {
+        currentStreak = Math.max(0, currentStreak - 1);
+        updateStreakClass();
+      }
 
       // Check if all 3 used → new set
       if (pieces.every(p => p.used)) {
@@ -832,32 +853,58 @@
     step();
   }
 
+  // Flood fill: find all connected same-value cells starting from (r,c)
+  function findGroup(r, c, val, visited) {
+    const group = [];
+    const stack = [[r, c]];
+    while (stack.length) {
+      const [cr, cc] = stack.pop();
+      if (cr < 0 || cr >= GRID || cc < 0 || cc >= GRID) continue;
+      if (visited[cr][cc]) continue;
+      if (board[cr][cc] !== val) continue;
+      visited[cr][cc] = true;
+      group.push([cr, cc]);
+      stack.push([cr + 1, cc], [cr - 1, cc], [cr, cc + 1], [cr, cc - 1]);
+    }
+    return group;
+  }
+
+  // Merge: find all connected groups of same numbers, merge each group at once
+  // A group of N same-value cells with value V → one cell with value V * 2^(N-1)
   function doMerges() {
     let merges = 0;
-    const merged = Array.from({ length: GRID }, () => Array(GRID).fill(false));
+    const visited = Array.from({ length: GRID }, () => Array(GRID).fill(false));
+    const groupsToMerge = [];
 
     for (let r = 0; r < GRID; r++) {
       for (let c = 0; c < GRID; c++) {
-        if (!board[r][c] || merged[r][c]) continue;
+        if (!board[r][c] || visited[r][c]) continue;
         const val = board[r][c];
-
-        // Check right
-        if (c + 1 < GRID && board[r][c + 1] === val && !merged[r][c + 1]) {
-          board[r][c + 1] = val * 2;
-          board[r][c] = 0;
-          merged[r][c + 1] = true;
-          merges++;
-          continue;
-        }
-        // Check down
-        if (r + 1 < GRID && board[r + 1][c] === val && !merged[r + 1][c]) {
-          board[r + 1][c] = val * 2;
-          board[r][c] = 0;
-          merged[r + 1][c] = true;
-          merges++;
+        const group = findGroup(r, c, val, visited);
+        if (group.length >= 2) {
+          groupsToMerge.push({ cells: group, val });
         }
       }
     }
+
+    // Apply merges: pick the "last" cell (bottom-right-most) of each group as the target
+    groupsToMerge.forEach(g => {
+      const target = g.cells.reduce((best, cell) => {
+        if (cell[0] > best[0] || (cell[0] === best[0] && cell[1] > best[1])) return cell;
+        return best;
+      }, g.cells[0]);
+
+      // Clear all cells in group
+      g.cells.forEach(([r, c]) => { board[r][c] = 0; });
+
+      // Set target to merged value
+      let mergedValue = g.val;
+      for (let i = 1; i < g.cells.length; i++) mergedValue *= 2;
+      board[target[0]][target[1]] = mergedValue;
+
+      merges += g.cells.length - 1;
+    });
+
     return merges;
   }
 
@@ -890,6 +937,10 @@
   // GAME OVER
   // =====================
   function isGameOver() {
+    // If player still has a rescue power-up, it's not game over
+    if (powerups.reshuffle > 0 || powerups.trash > 0 || powerups.bomb > 0 || powerups.hammer > 0) {
+      return false;
+    }
     for (const piece of pieces) {
       if (piece.used) continue;
       if (canPlaceAnywhere(piece)) return false;
@@ -899,8 +950,9 @@
 
   function showGameOver() {
     stopMusic();
+    currentStreak = 0;
+    updateStreakClass();
     haptic(50);
-    sfxGameOver();
     $('overScore').textContent = score.toLocaleString();
 
     const oldBest = parseInt(localStorage.getItem(BEST_KEY)) || 0;
@@ -970,10 +1022,221 @@
   }
 
   // =====================
+  // POWER-UPS
+  // =====================
+  function renderPowerups() {
+    const map = {
+      trash: $('puTrash'),
+      reshuffle: $('puReshuffle'),
+      hammer: $('puHammer'),
+      bomb: $('puBomb'),
+    };
+    Object.keys(map).forEach(k => {
+      const btn = map[k];
+      const count = powerups[k] || 0;
+      btn.classList.toggle('empty', count <= 0);
+      btn.classList.toggle('active', activePU === k);
+    });
+    $('puTrashCount').textContent     = powerups.trash;
+    $('puReshuffleCount').textContent = powerups.reshuffle;
+    $('puHammerCount').textContent    = powerups.hammer;
+    $('puBombCount').textContent      = powerups.bomb;
+  }
+
+  function setActivePU(name) {
+    activePU = name;
+    document.body.classList.toggle('hammer-active', name === 'hammer');
+    $('hammerMode').classList.toggle('active', name === 'hammer');
+    renderPowerups();
+    renderTray();
+  }
+
+  function togglePU(name) {
+    if (animating) return;
+    if (powerups[name] <= 0) return;
+    setActivePU(activePU === name ? null : name);
+  }
+
+  function usePU(name) {
+    if (animating) return;
+    if (powerups[name] <= 0) return;
+    if (name === 'reshuffle') useReshuffle();
+    else if (name === 'bomb') useBomb();
+  }
+
+  // Trash: remove a single piece from the tray
+  function trashPiece(idx) {
+    if (powerups.trash <= 0) return;
+    const piece = pieces[idx];
+    if (!piece || piece.used) return;
+
+    powerups.trash--;
+    piece.used = true;
+    haptic(10);
+
+    // If all 3 used → refresh
+    if (pieces.every(p => p.used)) pieces = genPieces();
+
+    setActivePU(null);
+    renderPowerups();
+    renderTray();
+    draw();
+    save();
+  }
+
+  // Swap: replace all current (unused) pieces with new ones
+  function useReshuffle() {
+    powerups.reshuffle--;
+    pieces = genPieces();
+    setActivePU(null);
+    haptic(15);
+    showPopup('SWAP!', 'merge-pop');
+    renderPowerups();
+    renderTray();
+    draw();
+    save();
+  }
+
+  // Hammer: remove a single block from the board
+  function useHammer(r, c) {
+    if (powerups.hammer <= 0) return;
+    if (!board[r][c]) return;
+    powerups.hammer--;
+    board[r][c] = 0;
+    haptic(20);
+    sfxPlace();
+    setActivePU(null);
+    renderPowerups();
+    draw();
+    save();
+
+    // Trigger merges/clears after removal
+    animating = true;
+    setTimeout(() => runChain(), 150);
+  }
+
+  // Bomb: clear the entire board with an explosion
+  function useBomb() {
+    powerups.bomb--;
+    setActivePU(null);
+    animating = true;
+    haptic(60);
+    showPopup('BOOM!', 'bomb-pop');
+    document.body.classList.add('flash');
+    setTimeout(() => document.body.classList.remove('flash'), 450);
+
+    // Count non-empty cells for score
+    let count = 0;
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) if (board[r][c]) count++;
+    }
+    const pts = count * 5;
+    score += pts;
+    if (pts > 0) showScorePop('+' + pts);
+
+    runBombAnimation(() => {
+      // Clear board after animation
+      board = Array.from({ length: GRID }, () => Array(GRID).fill(0));
+      updateHUD();
+      renderPowerups();
+      draw();
+      save();
+      animating = false;
+    });
+  }
+
+  // Particle-based bomb explosion on the effects canvas
+  function runBombAnimation(onDone) {
+    const total = cellSize * GRID;
+    const cx = total / 2;
+    const cy = total / 2;
+    const particles = [];
+    const colors = ['#f43f5e', '#fb923c', '#facc15', '#22d3ee', '#a3e635', '#38bdf8'];
+
+    // Rings of particles
+    for (let i = 0; i < 90; i++) {
+      const angle = (Math.PI * 2 * i) / 90 + Math.random() * 0.2;
+      const speed = 4 + Math.random() * 6;
+      particles.push({
+        x: cx, y: cy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: 4 + Math.random() * 6,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 1,
+      });
+    }
+
+    const startTime = performance.now();
+    const duration = 900;
+
+    function frame(now) {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / duration);
+
+      fxCtx.clearRect(0, 0, total, total);
+
+      // Central flash
+      if (t < 0.3) {
+        const a = 1 - (t / 0.3);
+        const grad = fxCtx.createRadialGradient(cx, cy, 0, cx, cy, total * 0.6);
+        grad.addColorStop(0, `rgba(255, 255, 255, ${a * 0.9})`);
+        grad.addColorStop(0.3, `rgba(251, 146, 60, ${a * 0.7})`);
+        grad.addColorStop(0.7, `rgba(244, 63, 94, ${a * 0.3})`);
+        grad.addColorStop(1, 'rgba(244, 63, 94, 0)');
+        fxCtx.fillStyle = grad;
+        fxCtx.fillRect(0, 0, total, total);
+      }
+
+      // Particles
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.25;
+        p.vx *= 0.985;
+        p.life = 1 - t;
+        if (p.life <= 0) return;
+        fxCtx.globalAlpha = p.life;
+        fxCtx.fillStyle = p.color;
+        fxCtx.beginPath();
+        fxCtx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+        fxCtx.fill();
+      });
+      fxCtx.globalAlpha = 1;
+
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        fxCtx.clearRect(0, 0, total, total);
+        if (onDone) onDone();
+      }
+    }
+
+    // Clear board visually mid-animation
+    setTimeout(() => {
+      board = Array.from({ length: GRID }, () => Array(GRID).fill(0));
+      draw();
+    }, 250);
+
+    requestAnimationFrame(frame);
+  }
+
+  // =====================
+  // DYNAMIC BACKGROUND (reacts to chain streaks)
+  // =====================
+  function updateStreakClass() {
+    const body = document.body;
+    body.classList.remove('streak-1', 'streak-2', 'streak-3');
+    if (currentStreak >= 5) body.classList.add('streak-3');
+    else if (currentStreak >= 3) body.classList.add('streak-2');
+    else if (currentStreak >= 1) body.classList.add('streak-1');
+  }
+
+  // =====================
   // SAVE / LOAD
   // =====================
   function save() {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ board, score, pieces }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ board, score, pieces, powerups }));
   }
 
   // =====================

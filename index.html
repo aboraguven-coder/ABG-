@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="NumDrop" />
-  <meta name="theme-color" content="#0f1119" />
+  <meta name="theme-color" content="#051223" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon-192.png" />
@@ -18,20 +18,26 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- GLOBAL ANIMATED BACKGROUND -->
+  <div class="global-bg" id="globalBg">
+    <div class="bg-grid"></div>
+    <div class="bg-shape bs1"></div>
+    <div class="bg-shape bs2"></div>
+    <div class="bg-shape bs3"></div>
+    <div class="bg-shape bs4"></div>
+    <div class="bg-shape bs5"></div>
+    <div class="bg-shape bs6"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div class="bg-glow bg-glow-3"></div>
+  </div>
+
   <div id="app">
 
     <!-- TITLE SCREEN -->
     <div class="screen active" id="titleScreen">
-      <div class="title-bg">
-        <div class="bg-num n1">2</div>
-        <div class="bg-num n2">8</div>
-        <div class="bg-num n3">32</div>
-        <div class="bg-num n4">4</div>
-        <div class="bg-num n5">16</div>
-        <div class="bg-num n6">64</div>
-      </div>
       <div class="title-content">
-        <h1 class="title-name">NUM<span>DROP</span></h1>
+        <h1 class="title-name">NUM<span class="rainbow-text">DROP</span></h1>
         <p class="title-sub">Drop. Merge. Blast.</p>
         <div class="title-buttons">
           <button class="btn btn-primary" id="btnNewGame">New Game</button>
@@ -60,10 +66,35 @@
 
       <div class="board-wrap" id="boardWrap">
         <canvas id="boardCanvas"></canvas>
+        <canvas id="effectsCanvas" class="effects-canvas"></canvas>
       </div>
 
       <div class="popup" id="popup"></div>
       <div class="score-pop" id="scorePop"></div>
+
+      <!-- POWER-UPS BAR -->
+      <div class="powerups" id="powerups">
+        <button class="pu-btn" data-pu="trash" id="puTrash">
+          <span class="pu-icon">&#128465;</span>
+          <span class="pu-label">Trash</span>
+          <span class="pu-count" id="puTrashCount">3</span>
+        </button>
+        <button class="pu-btn" data-pu="reshuffle" id="puReshuffle">
+          <span class="pu-icon">&#10227;</span>
+          <span class="pu-label">Swap</span>
+          <span class="pu-count" id="puReshuffleCount">2</span>
+        </button>
+        <button class="pu-btn" data-pu="hammer" id="puHammer">
+          <span class="pu-icon">&#128296;</span>
+          <span class="pu-label">Hammer</span>
+          <span class="pu-count" id="puHammerCount">2</span>
+        </button>
+        <button class="pu-btn pu-rare" data-pu="bomb" id="puBomb">
+          <span class="pu-icon">&#128163;</span>
+          <span class="pu-label">Bomb</span>
+          <span class="pu-count" id="puBombCount">1</span>
+        </button>
+      </div>
 
       <div class="tray" id="tray"></div>
     </div>
@@ -99,6 +130,12 @@
 
     <!-- DRAG GHOST (floating piece follows finger) -->
     <div class="drag-ghost" id="dragGhost"></div>
+
+    <!-- HAMMER MODE INDICATOR -->
+    <div class="hammer-mode" id="hammerMode">
+      <span>&#128296;</span> Tap a block to remove it
+      <button id="hammerCancel">Cancel</button>
+    </div>
 
   </div>
   <script src="app.js"></script>
