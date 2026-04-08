@@ -13,14 +13,19 @@
   const SAVE_KEY = 'numdrop_save';
   const BEST_KEY = 'numdrop_best';
   const SOUND_KEY = 'numdrop_sound';
+  const VIBE_KEY = 'numdrop_vibe';
   const PU_KEY = 'numdrop_pu';
   const PROGRESS_KEY = 'numdrop_progress';
+  const GOLD_KEY = 'numdrop_gold';
 
   // One-time starting power-ups (persistent across games)
   const PU_START = { trash: 3, reshuffle: 1, hammer: 1, bomb: 1 };
 
-  // Points required to fill the skill-progress bar
-  const SCORE_PER_REWARD = 800;
+  // Points required to fill the skill-progress bar (bigger = rarer drops)
+  const SCORE_PER_REWARD = 2500;
+
+  // Gold earned: 1 per this many points of score
+  const GOLD_PER_POINT = 20;
 
   // Weighted probabilities for skill rewards
   const REWARD_WEIGHTS = [
@@ -28,6 +33,14 @@
     { name: 'reshuffle', w: 25, label: 'Swap' },
     { name: 'hammer',    w: 15, label: 'Hammer' },
     { name: 'bomb',      w: 5,  label: 'Bomb',  rare: true },
+  ];
+
+  // Store prices for skills (in gold)
+  const STORE_ITEMS = [
+    { name: 'trash',     label: 'Trash',  price: 120, desc: 'Delete one tray piece.' },
+    { name: 'reshuffle', label: 'Swap',   price: 240, desc: 'Replace all current pieces.' },
+    { name: 'hammer',    label: 'Hammer', price: 320, desc: 'Remove one block on the board.' },
+    { name: 'bomb',      label: 'Bomb',   price: 650, desc: 'Clear the entire board.', rare: true },
   ];
 
   // =====================
@@ -135,12 +148,18 @@
     soundOn = !soundOn;
     localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off');
     const btn = $('btnSound');
-    btn.classList.toggle('muted', !soundOn);
-    if (soundOn) {
-      startMusic();
-    } else {
-      stopMusic();
-    }
+    if (btn) btn.classList.toggle('muted', !soundOn);
+    const setBtn = $('setSound');
+    if (setBtn) setBtn.classList.toggle('on', soundOn);
+    if (soundOn) startMusic();
+    else stopMusic();
+  }
+
+  function toggleVibe() {
+    vibeOn = !vibeOn;
+    localStorage.setItem(VIBE_KEY, vibeOn ? 'on' : 'off');
+    $('setVibe').classList.toggle('on', vibeOn);
+    if (vibeOn && navigator.vibrate) navigator.vibrate(10);
   }
 
   // Number → color mapping (vibrant & colorful)
@@ -210,6 +229,8 @@
   let activePU = null;       // current power-up mode: 'trash' | 'hammer' | null
   let currentStreak = 0;     // dynamic background level based on chain streaks
   let skillProgress = 0;     // 0..SCORE_PER_REWARD, fills to award random skill
+  let gold = 0;              // persistent gold currency
+  let vibeOn = true;         // vibration setting
 
   // =====================
   // DOM
@@ -238,6 +259,8 @@
     // Load persistent power-ups (first-ever load gets PU_START)
     loadPowerups();
     skillProgress = parseInt(localStorage.getItem(PROGRESS_KEY)) || 0;
+    gold = parseInt(localStorage.getItem(GOLD_KEY)) || 0;
+    vibeOn = localStorage.getItem(VIBE_KEY) !== 'off';
 
     // Sound button
     $('btnSound').onclick = toggleSound;
@@ -265,6 +288,15 @@
     $('btnHomeP').onclick = () => { pauseOverlay.classList.remove('active'); goHome(); };
     $('btnRetry').onclick = () => { overOverlay.classList.remove('active'); startNew(); };
     $('btnHomeO').onclick = () => { overOverlay.classList.remove('active'); goHome(); };
+
+    // Store + settings
+    $('btnStore').onclick = openStore;
+    $('btnCloseStore').onclick = closeStore;
+    $('btnSettings').onclick = openSettings;
+    $('btnCloseSettings').onclick = closeSettings;
+    $('setSound').onclick = toggleSound;
+    $('setVibe').onclick = toggleVibe;
+    $('btnResetProgress').onclick = resetAllProgress;
 
     // Power-up buttons
     $('puTrash').onclick     = () => togglePU('trash');
@@ -319,6 +351,29 @@
     best = parseInt(localStorage.getItem(BEST_KEY)) || 0;
     $('titleBest').textContent = best > 0 ? `High Score: ${best.toLocaleString()}` : '';
     $('btnContinue').style.display = localStorage.getItem(SAVE_KEY) ? 'block' : 'none';
+    $('homeGoldVal').textContent = gold.toLocaleString();
+    $('hsTrash').textContent  = powerups.trash;
+    $('hsSwap').textContent   = powerups.reshuffle;
+    $('hsHammer').textContent = powerups.hammer;
+    $('hsBomb').textContent   = powerups.bomb;
+  }
+
+  function updateGoldDisplays(pulse) {
+    const hg = $('homeGoldVal');
+    const gg = $('gameGoldVal');
+    const sg = $('storeGoldVal');
+    if (hg) hg.textContent = gold.toLocaleString();
+    if (gg) gg.textContent = gold.toLocaleString();
+    if (sg) sg.textContent = gold.toLocaleString();
+    if (pulse) {
+      [$('homeGoldPill'), $('gameGoldPill')].forEach(el => {
+        if (!el) return;
+        el.classList.remove('reward-bump');
+        void el.offsetWidth;
+        el.classList.add('reward-bump');
+        setTimeout(() => el.classList.remove('reward-bump'), 520);
+      });
+    }
   }
 
   // =====================
@@ -344,6 +399,7 @@
     renderTray();
     renderPowerups();
     updateProgressBar();
+    updateGoldDisplays(false);
     draw();
     save();
     if (soundOn) startMusic();
@@ -369,6 +425,7 @@
     renderTray();
     renderPowerups();
     updateProgressBar();
+    updateGoldDisplays(false);
     draw();
     if (soundOn) startMusic();
   }
@@ -387,11 +444,13 @@
   }
 
   function genNums(shape) {
-    const tier = Math.min(3, Math.floor(score / 500));
-    const pool = [2, 2, 2, 2, 4, 4];
-    if (tier >= 1) pool.push(4, 4, 8);
-    if (tier >= 2) pool.push(8, 8);
-    if (tier >= 3) pool.push(16);
+    // Faster difficulty curve — higher numbers appear sooner
+    const tier = Math.min(4, Math.floor(score / 300));
+    const pool = [2, 2, 2, 4, 4];
+    if (tier >= 1) pool.push(4, 8, 8);
+    if (tier >= 2) pool.push(8, 16);
+    if (tier >= 3) pool.push(16, 16);
+    if (tier >= 4) pool.push(32);
 
     return shape.map(row =>
       row.map(cell => cell ? pool[Math.floor(Math.random() * pool.length)] : 0)
@@ -447,6 +506,10 @@
     const gap = 1;
     const radius = Math.max(2, cellSize * 0.09);
 
+    // Background wash so empty cells look unified
+    ctx.fillStyle = 'rgba(4, 12, 24, 0.75)';
+    ctx.fillRect(0, 0, total, total);
+
     for (let r = 0; r < GRID; r++) {
       for (let c = 0; c < GRID; c++) {
         const x = c * cellSize + gap;
@@ -458,15 +521,24 @@
           const nc = getNumColor(board[r][c]);
           roundRect(x, y, w, h, radius, nc.bg);
           // Shine
-          ctx.fillStyle = 'rgba(255,255,255,0.1)';
-          ctx.fillRect(x + 2, y + 2, w - 4, Math.max(2, h * 0.12));
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          ctx.fillRect(x + 2, y + 2, w - 4, Math.max(2, h * 0.14));
           drawNum(board[r][c], x, y, w, h, nc.fg);
         } else {
-          const shade = (r + c) % 2 === 0 ? '#1a1d30' : '#212540';
+          // Empty cell: subtle fill + visible cyan border
+          const shade = (r + c) % 2 === 0 ? 'rgba(12, 30, 56, 0.6)' : 'rgba(18, 42, 74, 0.6)';
           roundRect(x, y, w, h, radius, shade);
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
         }
       }
     }
+
+    // Outer grid frame for clear separation
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(0.75, 0.75, total - 1.5, total - 1.5);
 
     // Hover preview (from drag or selected piece)
     const previewIdx = dragging ? dragIndex : selectedPiece;
@@ -1015,7 +1087,7 @@
   // HAPTIC FEEDBACK
   // =====================
   function haptic(ms) {
-    if (navigator.vibrate) {
+    if (vibeOn && navigator.vibrate) {
       navigator.vibrate(ms);
     }
   }
@@ -1363,6 +1435,15 @@
 
   function advanceProgress(points) {
     if (points <= 0) return;
+
+    // Earn gold from score gained
+    const goldGained = Math.floor(points / GOLD_PER_POINT);
+    if (goldGained > 0) {
+      gold += goldGained;
+      localStorage.setItem(GOLD_KEY, gold);
+      updateGoldDisplays(true);
+    }
+
     skillProgress += points;
     let awarded = 0;
     while (skillProgress >= SCORE_PER_REWARD && awarded < 3) {
@@ -1414,8 +1495,65 @@
     el.classList.remove('show');
     void el.offsetWidth;
     el.classList.add('show');
-    haptic(30);
-    setTimeout(() => el.classList.remove('show'), 1400);
+    haptic(reward.rare ? 60 : 30);
+    runConfetti(reward.rare);
+    setTimeout(() => el.classList.remove('show'), 1800);
+  }
+
+  // Confetti burst on the effects canvas — used for skill rewards
+  function runConfetti(rare) {
+    if (!fxCtx) return;
+    const total = cellSize * GRID;
+    const cx = total / 2;
+    const cy = total / 2;
+    const particles = [];
+    const colors = rare
+      ? ['#f43f5e', '#fb923c', '#facc15', '#ffffff']
+      : ['#22d3ee', '#a3e635', '#38bdf8', '#facc15', '#f472b6', '#ffffff'];
+    const count = rare ? 80 : 60;
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 3 + Math.random() * 7;
+      particles.push({
+        x: cx + (Math.random() - 0.5) * 40,
+        y: cy + (Math.random() - 0.5) * 20,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 2,
+        w: 4 + Math.random() * 6,
+        h: 6 + Math.random() * 8,
+        rot: Math.random() * Math.PI * 2,
+        vr: (Math.random() - 0.5) * 0.3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        life: 1,
+      });
+    }
+    const startTime = performance.now();
+    const duration = 1400;
+
+    function frame(now) {
+      const t = Math.min(1, (now - startTime) / duration);
+      fxCtx.clearRect(0, 0, total, total);
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.22;
+        p.vx *= 0.99;
+        p.rot += p.vr;
+        p.life = 1 - t;
+        if (p.life <= 0) return;
+        fxCtx.save();
+        fxCtx.translate(p.x, p.y);
+        fxCtx.rotate(p.rot);
+        fxCtx.globalAlpha = p.life;
+        fxCtx.fillStyle = p.color;
+        fxCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        fxCtx.restore();
+      });
+      fxCtx.globalAlpha = 1;
+      if (t < 1) requestAnimationFrame(frame);
+      else fxCtx.clearRect(0, 0, total, total);
+    }
+    requestAnimationFrame(frame);
   }
 
   function getSkillBadgeSVG(name) {
@@ -1537,6 +1675,95 @@
     }, 250);
 
     requestAnimationFrame(frame);
+  }
+
+  // =====================
+  // STORE
+  // =====================
+  function openStore() {
+    renderStore();
+    $('storeOverlay').classList.add('active');
+    haptic(10);
+  }
+  function closeStore() {
+    $('storeOverlay').classList.remove('active');
+  }
+  function renderStore() {
+    const list = $('storeList');
+    list.innerHTML = '';
+    updateGoldDisplays(false);
+    STORE_ITEMS.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'store-card' + (item.rare ? ' rare' : '');
+      card.setAttribute('data-k', item.name);
+      const owned = powerups[item.name] || 0;
+      const canBuy = gold >= item.price;
+      card.innerHTML = `
+        <div class="sc-icon">${getSkillBadgeSVG(item.name)}</div>
+        <div class="sc-info">
+          <div class="sc-name">${item.label} <span style="opacity:0.6;font-size:10px">x${owned}</span></div>
+          <div class="sc-desc">${item.desc}</div>
+        </div>
+        <button class="sc-buy" data-buy="${item.name}" ${canBuy ? '' : 'disabled'}>
+          <span class="coin-icon"></span>${item.price}
+        </button>
+      `;
+      list.appendChild(card);
+    });
+    // Wire buy buttons
+    list.querySelectorAll('[data-buy]').forEach(btn => {
+      btn.onclick = () => buySkill(btn.getAttribute('data-buy'));
+    });
+  }
+  function buySkill(name) {
+    const item = STORE_ITEMS.find(i => i.name === name);
+    if (!item || gold < item.price) return;
+    gold -= item.price;
+    powerups[name]++;
+    localStorage.setItem(GOLD_KEY, gold);
+    savePowerups();
+    haptic(25);
+    sfxPlace();
+    // Pulse the card
+    const card = document.querySelector(`.store-card[data-k="${name}"]`);
+    if (card) {
+      card.classList.remove('just-bought');
+      void card.offsetWidth;
+      card.classList.add('just-bought');
+    }
+    renderStore();
+    updateGoldDisplays(true);
+    updateTitleScreen();
+    renderPowerups();
+  }
+
+  // =====================
+  // SETTINGS
+  // =====================
+  function openSettings() {
+    $('setSound').classList.toggle('on', soundOn);
+    $('setVibe').classList.toggle('on', vibeOn);
+    $('settingsOverlay').classList.add('active');
+    haptic(10);
+  }
+  function closeSettings() {
+    $('settingsOverlay').classList.remove('active');
+  }
+  function resetAllProgress() {
+    if (!confirm('Reset all progress? This clears your gold, skills, high score, and saves.')) return;
+    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(BEST_KEY);
+    localStorage.removeItem(PU_KEY);
+    localStorage.removeItem(PROGRESS_KEY);
+    localStorage.removeItem(GOLD_KEY);
+    powerups = { ...PU_START };
+    savePowerups();
+    skillProgress = 0;
+    gold = 0;
+    best = 0;
+    score = 0;
+    closeSettings();
+    goHome();
   }
 
   // =====================

@@ -36,12 +36,47 @@
 
     <!-- TITLE SCREEN -->
     <div class="screen active" id="titleScreen">
+      <div class="title-topbar">
+        <div class="gold-pill" id="homeGoldPill">
+          <span class="coin-icon"></span>
+          <span id="homeGoldVal">0</span>
+        </div>
+        <button class="icon-btn gear-btn" id="btnSettings" title="Settings">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9.4 4c0-.4 0-.8-.1-1.2l2.1-1.6-2-3.4-2.5.9c-.6-.5-1.3-.9-2-1.2L16.5 3h-4l-.4 2.5c-.7.3-1.4.7-2 1.2l-2.5-.9-2 3.4L7.7 10.8c0 .4-.1.8-.1 1.2s0 .8.1 1.2l-2.1 1.6 2 3.4 2.5-.9c.6.5 1.3.9 2 1.2l.4 2.5h4l.4-2.5c.7-.3 1.4-.7 2-1.2l2.5.9 2-3.4-2.1-1.6c.1-.4.1-.8.1-1.2Z"/>
+          </svg>
+        </button>
+      </div>
       <div class="title-content">
         <h1 class="title-name">NUM<span class="rainbow-text">DROP</span></h1>
         <p class="title-sub">Drop. Merge. Blast.</p>
+
+        <div class="title-skills" id="homeSkills">
+          <div class="hs-item" data-k="trash">
+            <svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="2" rx="1" fill="currentColor"/><rect x="10" y="3" width="4" height="2" rx="0.5" fill="currentColor"/><path d="M6 8 L7.2 20 Q7.3 21.2 8.5 21.2 L15.5 21.2 Q16.7 21.2 16.8 20 L18 8 Z" fill="currentColor"/></svg>
+            <span class="hs-count" id="hsTrash">0</span>
+          </div>
+          <div class="hs-item" data-k="swap">
+            <svg viewBox="0 0 24 24"><path d="M5 12 A 7 7 0 0 1 17 7 L15 9 L20 9 L20 4 L18 6 A 9 9 0 0 0 3 12 Z" fill="currentColor"/><path d="M19 12 A 7 7 0 0 1 7 17 L9 15 L4 15 L4 20 L6 18 A 9 9 0 0 0 21 12 Z" fill="currentColor"/></svg>
+            <span class="hs-count" id="hsSwap">0</span>
+          </div>
+          <div class="hs-item" data-k="hammer">
+            <svg viewBox="0 0 24 24"><rect x="4" y="3" width="13" height="6" rx="1.2" fill="currentColor"/><rect x="10.2" y="9" width="2" height="12" rx="0.6" fill="#b8865a"/></svg>
+            <span class="hs-count" id="hsHammer">0</span>
+          </div>
+          <div class="hs-item" data-k="bomb">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7" fill="currentColor"/><path d="M14 7.5 Q16 5.5 17.5 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/><circle cx="17.5" cy="4" r="2" fill="#facc15"/></svg>
+            <span class="hs-count" id="hsBomb">0</span>
+          </div>
+        </div>
+
         <div class="title-buttons">
           <button class="btn btn-primary" id="btnNewGame">New Game</button>
           <button class="btn btn-secondary" id="btnContinue" style="display:none">Continue</button>
+          <button class="btn btn-store" id="btnStore">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M4 6l1-3h14l1 3v2H4V6Zm0 4h16v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V10Zm6 3v4h4v-4h-4Z"/></svg>
+            Store
+          </button>
         </div>
         <div class="title-best" id="titleBest"></div>
       </div>
@@ -60,6 +95,10 @@
             <div class="score-label">BEST</div>
             <div class="score-val dim" id="bestVal">0</div>
           </div>
+        </div>
+        <div class="gold-pill small" id="gameGoldPill">
+          <span class="coin-icon"></span>
+          <span id="gameGoldVal">0</span>
         </div>
         <button class="icon-btn sound-btn" id="btnSound" title="Toggle Sound">&#9835;</button>
       </div>
@@ -80,6 +119,8 @@
 
       <!-- SKILL REWARD FLYOUT -->
       <div class="skill-reward" id="skillReward">
+        <div class="sr-rays"></div>
+        <div class="sr-ring"></div>
         <div class="sr-badge" id="srBadge"></div>
         <div class="sr-text">New Skill!</div>
         <div class="sr-name" id="srName">Trash</div>
@@ -172,6 +213,45 @@
         <div class="modal-btns">
           <button class="btn btn-primary" id="btnRetry">Play Again</button>
           <button class="btn btn-ghost" id="btnHomeO">Home</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STORE OVERLAY -->
+    <div class="overlay" id="storeOverlay">
+      <div class="modal modal-store">
+        <div class="store-header">
+          <h2>Store</h2>
+          <div class="gold-pill">
+            <span class="coin-icon"></span>
+            <span id="storeGoldVal">0</span>
+          </div>
+        </div>
+        <p class="store-sub">Earn gold by scoring. Spend it on skills.</p>
+        <div class="store-list" id="storeList"></div>
+        <div class="modal-btns">
+          <button class="btn btn-ghost" id="btnCloseStore">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS OVERLAY -->
+    <div class="overlay" id="settingsOverlay">
+      <div class="modal">
+        <h2>Settings</h2>
+        <div class="settings-list">
+          <label class="setting-row">
+            <span class="setting-label">Music & Sound</span>
+            <span class="toggle" id="setSound"><span class="knob"></span></span>
+          </label>
+          <label class="setting-row">
+            <span class="setting-label">Vibration</span>
+            <span class="toggle" id="setVibe"><span class="knob"></span></span>
+          </label>
+          <button class="btn btn-secondary" id="btnResetProgress">Reset All Progress</button>
+        </div>
+        <div class="modal-btns">
+          <button class="btn btn-ghost" id="btnCloseSettings">Close</button>
         </div>
       </div>
     </div>
