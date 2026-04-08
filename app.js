@@ -13,9 +13,22 @@
   const SAVE_KEY = 'numdrop_save';
   const BEST_KEY = 'numdrop_best';
   const SOUND_KEY = 'numdrop_sound';
+  const PU_KEY = 'numdrop_pu';
+  const PROGRESS_KEY = 'numdrop_progress';
 
-  // Starting power-up counts
-  const PU_START = { trash: 3, reshuffle: 2, hammer: 2, bomb: 1 };
+  // One-time starting power-ups (persistent across games)
+  const PU_START = { trash: 3, reshuffle: 1, hammer: 1, bomb: 1 };
+
+  // Points required to fill the skill-progress bar
+  const SCORE_PER_REWARD = 800;
+
+  // Weighted probabilities for skill rewards
+  const REWARD_WEIGHTS = [
+    { name: 'trash',     w: 55, label: 'Trash' },
+    { name: 'reshuffle', w: 25, label: 'Swap' },
+    { name: 'hammer',    w: 15, label: 'Hammer' },
+    { name: 'bomb',      w: 5,  label: 'Bomb',  rare: true },
+  ];
 
   // =====================
   // AUDIO ENGINE (Web Audio API — no files needed)
@@ -47,67 +60,66 @@
     osc.stop(audioCtx.currentTime + duration);
   }
 
-  // Only the place/crash sound — user removed others, music plays instead
+  // Place/crash sound
   function sfxPlace() {
     playTone(180, 0.14, 'triangle', 0.22);
     playTone(280, 0.1, 'sine', 0.12);
   }
 
+  // "AMAZING!" big crash — rising arpeggio + low boom
+  function sfxBigCrash() {
+    if (!audioCtx || !soundOn) return;
+    // Low boom
+    playTone(120, 0.35, 'sine', 0.25, 70);
+    // Rising bell arpeggio
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5]; // C5 E5 G5 C6 E6
+    notes.forEach((f, i) => {
+      setTimeout(() => playTone(f, 0.22, 'triangle', 0.18), i * 70);
+    });
+  }
+
   // --- BACKGROUND MUSIC ---
-  // Simple ambient loop: soft chord progression
+  // Peaceful lullaby — single sine melody with soft envelope. Very quiet.
   function startMusic() {
     if (!audioCtx || musicPlaying || !soundOn) return;
     musicPlaying = true;
 
     musicGain = audioCtx.createGain();
-    musicGain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+    musicGain.gain.setValueAtTime(0.028, audioCtx.currentTime);
     musicGain.connect(audioCtx.destination);
 
-    // Chord progression: Am → F → C → G (classic chill loop)
-    const chords = [
-      [220, 261.6, 329.6],   // Am
-      [174.6, 220, 261.6],   // F
-      [261.6, 329.6, 392],   // C
-      [196, 246.9, 293.7],   // G
+    // Gentle slow lullaby (C major): G4 C5 E5 C5 D5 A4 G4 (rest) — ~2s per note
+    const melody = [
+      392.00, 523.25, 659.25, 523.25,
+      587.33, 440.00, 392.00, 0,
+      523.25, 659.25, 783.99, 659.25,
+      587.33, 523.25, 440.00, 0,
     ];
 
-    let chordIdx = 0;
-    let activeOscs = [];
+    let idx = 0;
+    const noteDur = 2.0;
 
-    function playChord() {
+    function playNote() {
       if (!soundOn || !musicPlaying) return;
-
-      // Fade out old
-      activeOscs.forEach(o => {
-        try { o.gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5); } catch(e) {}
-      });
-      setTimeout(() => {
-        activeOscs.forEach(o => { try { o.osc.stop(); } catch(e) {} });
-        activeOscs = [];
-      }, 600);
-
-      const chord = chords[chordIdx % chords.length];
-      chord.forEach(freq => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.8);
-        gain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 2.5);
-        gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 3.8);
-        osc.connect(gain);
-        gain.connect(musicGain);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 4.0);
-        activeOscs.push({ osc, gain });
-      });
-
-      chordIdx++;
+      const f = melody[idx % melody.length];
+      idx++;
+      if (!f) return; // rest
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.35);
+      gain.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + noteDur * 0.65);
+      gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + noteDur);
+      osc.connect(gain);
+      gain.connect(musicGain);
+      osc.start();
+      osc.stop(audioCtx.currentTime + noteDur + 0.1);
     }
 
-    playChord();
-    window._musicInterval = setInterval(playChord, 3800);
+    playNote();
+    window._musicInterval = setInterval(playNote, noteDur * 1000);
   }
 
   function stopMusic() {
@@ -193,10 +205,11 @@
   let fxCanvas, fxCtx;
   let cellSize = 0;
 
-  // Power-ups
+  // Power-ups (persistent across games)
   let powerups = { ...PU_START };
   let activePU = null;       // current power-up mode: 'trash' | 'hammer' | null
   let currentStreak = 0;     // dynamic background level based on chain streaks
+  let skillProgress = 0;     // 0..SCORE_PER_REWARD, fills to award random skill
 
   // =====================
   // DOM
@@ -221,6 +234,10 @@
     fxCanvas = $('effectsCanvas');
     fxCtx = fxCanvas.getContext('2d');
     best = parseInt(localStorage.getItem(BEST_KEY)) || 0;
+
+    // Load persistent power-ups (first-ever load gets PU_START)
+    loadPowerups();
+    skillProgress = parseInt(localStorage.getItem(PROGRESS_KEY)) || 0;
 
     // Sound button
     $('btnSound').onclick = toggleSound;
@@ -316,7 +333,7 @@
     dragging = false;
     dragIndex = -1;
     pieces = genPieces();
-    powerups = { ...PU_START };
+    // Power-ups and skillProgress persist across games — do not reset.
     setActivePU(null);
     currentStreak = 0;
     updateStreakClass();
@@ -326,6 +343,7 @@
     updateHUD();
     renderTray();
     renderPowerups();
+    updateProgressBar();
     draw();
     save();
     if (soundOn) startMusic();
@@ -337,7 +355,7 @@
     board = data.board;
     score = data.score;
     pieces = data.pieces;
-    powerups = Object.assign({ ...PU_START }, data.powerups || {});
+    // Power-ups loaded from PU_KEY in init() — don't overwrite from save.
     selectedPiece = -1;
     hoverCell = null;
     animating = false;
@@ -350,6 +368,7 @@
     updateHUD();
     renderTray();
     renderPowerups();
+    updateProgressBar();
     draw();
     if (soundOn) startMusic();
   }
@@ -384,8 +403,8 @@
   // =====================
   function sizeCanvas() {
     const wrap = $('boardWrap');
-    const maxW = wrap.clientWidth - 24;
-    const maxH = wrap.clientHeight - 12;
+    const maxW = wrap.clientWidth - 12;
+    const maxH = wrap.clientHeight - 8;
     const size = Math.min(maxW, maxH);
 
     const dpr = window.devicePixelRatio || 1;
@@ -425,8 +444,8 @@
     const total = cellSize * GRID;
     ctx.clearRect(0, 0, total, total);
 
-    const gap = 2;
-    const radius = Math.max(3, cellSize * 0.12);
+    const gap = 1;
+    const radius = Math.max(2, cellSize * 0.09);
 
     for (let r = 0; r < GRID; r++) {
       for (let c = 0; c < GRID; c++) {
@@ -754,6 +773,7 @@
     const piece = pieces[idx];
     if (!hoverCell || !canPlace(piece, hoverCell.row, hoverCell.col)) return;
 
+    const preScore = score;
     let cellsPlaced = 0;
     for (let r = 0; r < piece.shape.length; r++) {
       for (let c = 0; c < piece.shape[r].length; c++) {
@@ -777,13 +797,14 @@
     updateHUD();
     draw();
 
-    setTimeout(() => runChain(), 150);
+    setTimeout(() => runChain(preScore), 150);
   }
 
   // =====================
   // MERGE + CLEAR CHAIN
   // =====================
-  function runChain() {
+  function runChain(preScore) {
+    if (preScore === undefined) preScore = score;
     let totalMerges = 0;
     let totalClears = 0;
     let chainStep = 0;
@@ -824,9 +845,21 @@
         return;
       }
 
-      // Chain complete
-      if (totalMerges >= 3) { showPopup('CHAIN!', 'merge-pop'); }
-      else if (totalClears >= 2) { showPopup('COMBO!', 'clear-pop'); }
+      // Chain complete — big combo detection
+      const bigCombo = totalClears >= 3 || totalMerges >= 5 || (totalMerges >= 3 && totalClears >= 1);
+      if (bigCombo) {
+        showPopup('AMAZING!', 'bomb-pop');
+        sfxBigCrash();
+        document.body.classList.add('flash');
+        document.body.classList.add('shake');
+        setTimeout(() => document.body.classList.remove('flash'), 450);
+        setTimeout(() => document.body.classList.remove('shake'), 550);
+        haptic(60);
+      } else if (totalMerges >= 3) {
+        showPopup('CHAIN!', 'merge-pop');
+      } else if (totalClears >= 2) {
+        showPopup('COMBO!', 'clear-pop');
+      }
 
       // Decay streak when nothing happens this placement
       if (totalMerges === 0 && totalClears === 0) {
@@ -844,6 +877,9 @@
       renderTray();
       draw();
       save();
+
+      // Award progress from total score gained this turn
+      advanceProgress(score - preScore);
 
       if (isGameOver()) {
         setTimeout(showGameOver, 400);
@@ -1024,6 +1060,30 @@
   // =====================
   // POWER-UPS
   // =====================
+  function loadPowerups() {
+    try {
+      const raw = localStorage.getItem(PU_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        powerups = {
+          trash:     Math.max(0, parseInt(data.trash)     || 0),
+          reshuffle: Math.max(0, parseInt(data.reshuffle) || 0),
+          hammer:    Math.max(0, parseInt(data.hammer)    || 0),
+          bomb:      Math.max(0, parseInt(data.bomb)      || 0),
+        };
+      } else {
+        // First ever load — give starting supply
+        powerups = { ...PU_START };
+        savePowerups();
+      }
+    } catch (e) {
+      powerups = { ...PU_START };
+    }
+  }
+  function savePowerups() {
+    localStorage.setItem(PU_KEY, JSON.stringify(powerups));
+  }
+
   function renderPowerups() {
     const map = {
       trash: $('puTrash'),
@@ -1064,66 +1124,215 @@
     else if (name === 'bomb') useBomb();
   }
 
-  // Trash: remove a single piece from the tray
+  // Trash: delete a single tray piece with a "poof" animation
   function trashPiece(idx) {
     if (powerups.trash <= 0) return;
     const piece = pieces[idx];
     if (!piece || piece.used) return;
 
     powerups.trash--;
-    piece.used = true;
+    savePowerups();
     haptic(10);
+    sfxPlace();
 
-    // If all 3 used → refresh
-    if (pieces.every(p => p.used)) pieces = genPieces();
+    // Poof animation on the slot DOM element
+    const slot = trayEl.children[idx];
+    if (slot) slot.classList.add('poofing');
 
-    setActivePU(null);
-    renderPowerups();
-    renderTray();
-    draw();
-    save();
+    animating = true;
+    setTimeout(() => {
+      piece.used = true;
+      if (pieces.every(p => p.used)) pieces = genPieces();
+      setActivePU(null);
+      renderPowerups();
+      renderTray();
+      draw();
+      animating = false;
+      save();
+    }, 420);
   }
 
-  // Swap: replace all current (unused) pieces with new ones
+  // Swap: animate old pieces out, spin new ones in
   function useReshuffle() {
     powerups.reshuffle--;
-    pieces = genPieces();
+    savePowerups();
     setActivePU(null);
     haptic(15);
+    sfxPlace();
     showPopup('SWAP!', 'merge-pop');
-    renderPowerups();
-    renderTray();
-    draw();
-    save();
+
+    animating = true;
+
+    // Animate current slots out
+    Array.from(trayEl.children).forEach((slot, i) => {
+      slot.style.animationDelay = (i * 60) + 'ms';
+      slot.classList.add('swap-out');
+    });
+
+    setTimeout(() => {
+      pieces = genPieces();
+      renderTray();
+      // Animate new slots in
+      Array.from(trayEl.children).forEach((slot, i) => {
+        slot.style.animationDelay = (i * 60) + 'ms';
+        slot.classList.add('swap-in');
+      });
+      renderPowerups();
+      draw();
+      save();
+      setTimeout(() => {
+        Array.from(trayEl.children).forEach(slot => {
+          slot.classList.remove('swap-in');
+          slot.style.animationDelay = '';
+        });
+        animating = false;
+      }, 600);
+    }, 450);
   }
 
-  // Hammer: remove a single block from the board
+  // Hammer: animated strike on a board cell
   function useHammer(r, c) {
     if (powerups.hammer <= 0) return;
     if (!board[r][c]) return;
     powerups.hammer--;
-    board[r][c] = 0;
-    haptic(20);
+    savePowerups();
+    haptic(25);
     sfxPlace();
     setActivePU(null);
-    renderPowerups();
-    draw();
-    save();
 
-    // Trigger merges/clears after removal
     animating = true;
-    setTimeout(() => runChain(), 150);
+
+    runHammerAnimation(r, c, () => {
+      board[r][c] = 0;
+      renderPowerups();
+      draw();
+      save();
+      setTimeout(() => runChain(), 120);
+    });
   }
 
-  // Bomb: clear the entire board with an explosion
+  // Hammer strike effect: draw a swinging hammer on fxCanvas, then burst particles
+  function runHammerAnimation(r, c, onDone) {
+    const cx = c * cellSize + cellSize / 2;
+    const cy = r * cellSize + cellSize / 2;
+    const total = cellSize * GRID;
+    const startTime = performance.now();
+    const swingDur = 280;
+    const burstDur = 450;
+    const colors = ['#fb923c', '#facc15', '#f43f5e', '#22d3ee', '#a3e635'];
+    const particles = [];
+    let burstStarted = false;
+
+    function spawnBurst() {
+      for (let i = 0; i < 28; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 3 + Math.random() * 5;
+        particles.push({
+          x: cx, y: cy,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp,
+          r: 2 + Math.random() * 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          life: 1,
+        });
+      }
+      haptic(40);
+      document.body.classList.add('shake');
+      setTimeout(() => document.body.classList.remove('shake'), 400);
+    }
+
+    function frame(now) {
+      const elapsed = now - startTime;
+      fxCtx.clearRect(0, 0, total, total);
+
+      if (elapsed < swingDur) {
+        // Swinging hammer animation — tilts then strikes
+        const t = elapsed / swingDur;
+        const ease = 1 - Math.pow(1 - t, 3);
+        const angle = -1.1 + ease * 1.7; // swing from -63deg → +35deg
+        const hx = cx;
+        const hy = cy - cellSize * 1.6 * (1 - ease);
+        fxCtx.save();
+        fxCtx.translate(hx, hy);
+        fxCtx.rotate(angle);
+        const hs = cellSize * 0.9;
+        // Handle
+        fxCtx.fillStyle = '#b8865a';
+        fxCtx.fillRect(-hs * 0.08, 0, hs * 0.16, hs * 0.9);
+        // Head
+        fxCtx.fillStyle = '#fb923c';
+        fxCtx.shadowColor = 'rgba(251, 146, 60, 0.9)';
+        fxCtx.shadowBlur = 20;
+        roundRectCtx(fxCtx, -hs * 0.42, -hs * 0.2, hs * 0.84, hs * 0.4, hs * 0.1);
+        fxCtx.shadowBlur = 0;
+        // Shine
+        fxCtx.fillStyle = 'rgba(255,255,255,0.35)';
+        fxCtx.fillRect(-hs * 0.35, -hs * 0.15, hs * 0.7, hs * 0.06);
+        fxCtx.restore();
+      } else {
+        if (!burstStarted) {
+          burstStarted = true;
+          spawnBurst();
+        }
+        const t = Math.min(1, (elapsed - swingDur) / burstDur);
+
+        // Impact shockwave ring
+        if (t < 0.6) {
+          const ringR = cellSize * (0.3 + t * 2.5);
+          const a = 1 - t / 0.6;
+          fxCtx.strokeStyle = `rgba(251, 146, 60, ${a})`;
+          fxCtx.lineWidth = 4;
+          fxCtx.beginPath();
+          fxCtx.arc(cx, cy, ringR, 0, Math.PI * 2);
+          fxCtx.stroke();
+        }
+
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.2;
+          p.vx *= 0.98;
+          p.life = 1 - t;
+          if (p.life <= 0) return;
+          fxCtx.globalAlpha = p.life;
+          fxCtx.fillStyle = p.color;
+          fxCtx.beginPath();
+          fxCtx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+          fxCtx.fill();
+        });
+        fxCtx.globalAlpha = 1;
+      }
+
+      if (elapsed < swingDur + burstDur) {
+        requestAnimationFrame(frame);
+      } else {
+        fxCtx.clearRect(0, 0, total, total);
+        if (onDone) onDone();
+      }
+    }
+
+    // Clear the cell at impact
+    setTimeout(() => {
+      board[r][c] = 0;
+      draw();
+    }, swingDur);
+
+    requestAnimationFrame(frame);
+  }
+
+  // Bomb: clear the entire board with a particle explosion + screen shake
   function useBomb() {
     powerups.bomb--;
+    savePowerups();
     setActivePU(null);
     animating = true;
-    haptic(60);
+    haptic(80);
+    sfxBigCrash();
     showPopup('BOOM!', 'bomb-pop');
     document.body.classList.add('flash');
+    document.body.classList.add('shake');
     setTimeout(() => document.body.classList.remove('flash'), 450);
+    setTimeout(() => document.body.classList.remove('shake'), 550);
 
     // Count non-empty cells for score
     let count = 0;
@@ -1135,7 +1344,6 @@
     if (pts > 0) showScorePop('+' + pts);
 
     runBombAnimation(() => {
-      // Clear board after animation
       board = Array.from({ length: GRID }, () => Array(GRID).fill(0));
       updateHUD();
       renderPowerups();
@@ -1143,6 +1351,116 @@
       save();
       animating = false;
     });
+  }
+
+  // ===== SKILL PROGRESS / RANDOM REWARDS =====
+  function updateProgressBar() {
+    const pct = Math.min(100, (skillProgress / SCORE_PER_REWARD) * 100);
+    $('spFill').style.width = pct + '%';
+    const remaining = Math.max(0, SCORE_PER_REWARD - skillProgress);
+    $('spLabel').textContent = remaining > 0 ? `Next Skill • ${remaining}` : 'Skill Ready!';
+  }
+
+  function advanceProgress(points) {
+    if (points <= 0) return;
+    skillProgress += points;
+    let awarded = 0;
+    while (skillProgress >= SCORE_PER_REWARD && awarded < 3) {
+      skillProgress -= SCORE_PER_REWARD;
+      awardRandomSkill();
+      awarded++;
+    }
+    localStorage.setItem(PROGRESS_KEY, skillProgress);
+    updateProgressBar();
+    const bar = $('skillProgress');
+    bar.classList.remove('filling');
+    void bar.offsetWidth;
+    bar.classList.add('filling');
+    setTimeout(() => bar.classList.remove('filling'), 800);
+  }
+
+  function awardRandomSkill() {
+    const total = REWARD_WEIGHTS.reduce((s, r) => s + r.w, 0);
+    let roll = Math.random() * total;
+    let chosen = REWARD_WEIGHTS[0];
+    for (const r of REWARD_WEIGHTS) {
+      roll -= r.w;
+      if (roll <= 0) { chosen = r; break; }
+    }
+    powerups[chosen.name]++;
+    savePowerups();
+    renderPowerups();
+    showSkillReward(chosen);
+
+    // Pulse the awarded button
+    const btnId = { trash: 'puTrash', reshuffle: 'puReshuffle', hammer: 'puHammer', bomb: 'puBomb' }[chosen.name];
+    const btn = $(btnId);
+    if (btn) {
+      btn.classList.remove('reward-pulse');
+      void btn.offsetWidth;
+      btn.classList.add('reward-pulse');
+      setTimeout(() => btn.classList.remove('reward-pulse'), 900);
+    }
+  }
+
+  // Show the skill reward flyout with an SVG badge matching the skill
+  function showSkillReward(reward) {
+    const el = $('skillReward');
+    const badge = $('srBadge');
+    const nameEl = $('srName');
+    badge.innerHTML = getSkillBadgeSVG(reward.name);
+    nameEl.textContent = reward.label;
+    el.classList.toggle('rare-drop', !!reward.rare);
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    haptic(30);
+    setTimeout(() => el.classList.remove('show'), 1400);
+  }
+
+  function getSkillBadgeSVG(name) {
+    // Reuse the same SVG inlines as the power-up buttons (simplified)
+    switch (name) {
+      case 'trash':
+        return `<svg viewBox="0 0 24 24" style="color:var(--neon-cyan);filter:drop-shadow(0 0 10px rgba(34,211,238,0.8))">
+          <rect x="4" y="5.5" width="16" height="2" rx="1" fill="currentColor"/>
+          <rect x="10" y="3" width="4" height="2" rx="0.5" fill="currentColor"/>
+          <path d="M6 8 L7.2 20 Q7.3 21.2 8.5 21.2 L15.5 21.2 Q16.7 21.2 16.8 20 L18 8 Z" fill="currentColor"/>
+        </svg>`;
+      case 'reshuffle':
+        return `<svg viewBox="0 0 24 24" style="color:var(--neon-lime);filter:drop-shadow(0 0 10px rgba(163,230,53,0.8))">
+          <path d="M5 12 A 7 7 0 0 1 17 7 L15 9 L20 9 L20 4 L18 6 A 9 9 0 0 0 3 12 Z" fill="currentColor"/>
+          <path d="M19 12 A 7 7 0 0 1 7 17 L9 15 L4 15 L4 20 L6 18 A 9 9 0 0 0 21 12 Z" fill="currentColor"/>
+        </svg>`;
+      case 'hammer':
+        return `<svg viewBox="0 0 24 24" style="color:var(--neon-orange);filter:drop-shadow(0 0 10px rgba(251,146,60,0.8))">
+          <rect x="4" y="3" width="13" height="6" rx="1.2" fill="currentColor"/>
+          <rect x="10.2" y="9" width="2" height="12" rx="0.6" fill="#b8865a"/>
+        </svg>`;
+      case 'bomb':
+        return `<svg viewBox="0 0 24 24" style="color:var(--neon-pink);filter:drop-shadow(0 0 14px rgba(244,63,94,0.9))">
+          <circle cx="11" cy="14" r="7" fill="currentColor"/>
+          <path d="M14 7.5 Q16 5.5 17.5 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          <circle cx="17.5" cy="4" r="2" fill="#facc15"/>
+        </svg>`;
+    }
+    return '';
+  }
+
+  // Helper: draw rounded rect on an arbitrary ctx
+  function roundRectCtx(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.lineTo(x + w - r, y);
+    c.quadraticCurveTo(x + w, y, x + w, y + r);
+    c.lineTo(x + w, y + h - r);
+    c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    c.lineTo(x + r, y + h);
+    c.quadraticCurveTo(x, y + h, x, y + h - r);
+    c.lineTo(x, y + r);
+    c.quadraticCurveTo(x, y, x + r, y);
+    c.closePath();
+    c.fill();
   }
 
   // Particle-based bomb explosion on the effects canvas
@@ -1236,7 +1554,8 @@
   // SAVE / LOAD
   // =====================
   function save() {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ board, score, pieces, powerups }));
+    // Power-ups and skillProgress persist via PU_KEY / PROGRESS_KEY separately.
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ board, score, pieces }));
   }
 
   // =====================

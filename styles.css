@@ -339,7 +339,7 @@ body.streak-3 .score-val {
 .board-wrap {
   flex: 1; display: flex;
   align-items: center; justify-content: center;
-  padding: 4px 12px; min-height: 0;
+  padding: 4px 6px; min-height: 0;
   position: relative;
   z-index: 2;
 }
@@ -437,9 +437,61 @@ body.streak-3 .score-val {
 }
 
 .pu-icon {
-  font-size: 20px;
+  width: 26px; height: 26px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
   line-height: 1;
 }
+.pu-svg {
+  width: 100%; height: 100%;
+  overflow: visible;
+}
+
+/* Per-skill colors */
+#puTrash .pu-svg     { color: var(--neon-cyan); filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.6)); }
+#puReshuffle .pu-svg { color: var(--neon-lime); filter: drop-shadow(0 0 6px rgba(163, 230, 53, 0.6)); }
+#puHammer .pu-svg    { color: var(--neon-orange); filter: drop-shadow(0 0 6px rgba(251, 146, 60, 0.6)); }
+#puBomb .pu-svg      { color: var(--neon-pink); filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.8)); }
+
+/* Per-skill icon animations */
+.pu-anim-trash-lid {
+  transform-origin: 6px 6px;
+  animation: trashLid 2.4s ease-in-out infinite;
+}
+@keyframes trashLid {
+  0%, 70%, 100% { transform: rotate(0deg); }
+  80%           { transform: rotate(-18deg) translateY(-0.5px); }
+  90%           { transform: rotate(2deg); }
+}
+
+.pu-anim-swap-rot {
+  transform-origin: 12px 12px;
+  animation: swapSpin 3.2s linear infinite;
+}
+@keyframes swapSpin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.pu-anim-hammer-swing {
+  transform-origin: 11px 20px;
+  animation: hammerSwing 1.8s ease-in-out infinite;
+}
+@keyframes hammerSwing {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  75%           { transform: rotate(-42deg); }
+  85%           { transform: rotate(8deg); }
+}
+
+.pu-anim-bomb-spark {
+  transform-origin: 17.5px 4px;
+  animation: bombSpark 0.6s ease-in-out infinite;
+}
+@keyframes bombSpark {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.5); opacity: 0.7; }
+}
+
 .pu-label {
   font-size: 9px;
   font-weight: 700;
@@ -465,14 +517,176 @@ body.streak-3 .score-val {
 .pu-rare {
   background: linear-gradient(135deg, rgba(244, 63, 94, 0.25), rgba(251, 146, 60, 0.25));
   border-color: rgba(244, 63, 94, 0.5);
+  animation: rareGlow 2.5s ease-in-out infinite;
+}
+@keyframes rareGlow {
+  0%, 100% { box-shadow: 0 0 0 rgba(244, 63, 94, 0.4); }
+  50%      { box-shadow: 0 0 18px rgba(244, 63, 94, 0.7); }
 }
 .pu-rare .pu-count {
   background: var(--neon-pink);
   color: #fff;
   box-shadow: 0 0 12px rgba(244, 63, 94, 0.8);
 }
-.pu-rare .pu-icon {
-  filter: drop-shadow(0 0 6px rgba(244, 63, 94, 0.6));
+
+/* Reward pulse when a skill count increases */
+.pu-btn.reward-pulse { animation: puReward 0.9s ease-out; }
+@keyframes puReward {
+  0%   { transform: scale(1); box-shadow: 0 0 0 rgba(34,211,238,0); }
+  30%  { transform: scale(1.25); box-shadow: 0 0 28px rgba(34,211,238,0.9); }
+  100% { transform: scale(1); box-shadow: 0 0 0 rgba(34,211,238,0); }
+}
+
+/* ===== SKILL PROGRESS BAR ===== */
+.skill-progress {
+  position: relative;
+  height: 10px;
+  margin: 0 14px 4px;
+  background: rgba(8, 26, 48, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  z-index: 2;
+}
+.sp-fill {
+  position: absolute; inset: 0;
+  width: 0%;
+  background: linear-gradient(90deg,
+    var(--neon-cyan), var(--neon-lime), var(--neon-yellow),
+    var(--neon-orange), var(--neon-pink));
+  background-size: 200% 100%;
+  border-radius: 6px;
+  transition: width 0.35s ease;
+  animation: spShimmer 2.5s linear infinite;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+}
+@keyframes spShimmer {
+  0%   { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+.sp-label {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+.skill-progress.filling .sp-fill {
+  animation: spShimmer 0.8s linear infinite, spPulse 0.6s ease-out;
+}
+@keyframes spPulse {
+  0%   { filter: brightness(1); }
+  50%  { filter: brightness(1.8) saturate(1.5); }
+  100% { filter: brightness(1); }
+}
+
+/* ===== SKILL REWARD FLYOUT ===== */
+.skill-reward {
+  position: fixed;
+  top: 30%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.4);
+  background: linear-gradient(135deg, rgba(14, 37, 64, 0.96), rgba(8, 26, 48, 0.96));
+  border: 2px solid var(--neon-cyan);
+  border-radius: 20px;
+  padding: 18px 28px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 70;
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.3),
+    0 20px 60px rgba(0,0,0,0.7),
+    0 0 60px rgba(34, 211, 238, 0.5);
+  transition: opacity 0.35s, transform 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+  backdrop-filter: blur(8px);
+}
+.skill-reward.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.sr-badge {
+  width: 56px; height: 56px;
+  margin: 0 auto 8px;
+  display: flex; align-items: center; justify-content: center;
+  animation: srSpin 0.8s ease-out;
+}
+.sr-badge svg { width: 100%; height: 100%; }
+@keyframes srSpin {
+  0%   { transform: rotate(-180deg) scale(0.2); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+.sr-text {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text2);
+  font-weight: 700;
+}
+.sr-name {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 14px rgba(34, 211, 238, 0.7);
+  margin-top: 2px;
+}
+.skill-reward.rare-drop {
+  border-color: var(--neon-pink);
+  box-shadow:
+    0 0 0 1px rgba(244, 63, 94, 0.4),
+    0 20px 60px rgba(0,0,0,0.7),
+    0 0 80px rgba(244, 63, 94, 0.7);
+}
+.skill-reward.rare-drop .sr-name {
+  color: var(--neon-pink);
+  text-shadow: 0 0 14px rgba(244, 63, 94, 0.8);
+}
+
+/* ===== SCREEN SHAKE (bomb) ===== */
+body.shake { animation: screenShake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+@keyframes screenShake {
+  0%, 100% { transform: translate(0, 0); }
+  10%  { transform: translate(-6px, -3px); }
+  20%  { transform: translate(7px, 4px); }
+  30%  { transform: translate(-5px, 5px); }
+  40%  { transform: translate(6px, -4px); }
+  50%  { transform: translate(-4px, 3px); }
+  60%  { transform: translate(5px, 2px); }
+  70%  { transform: translate(-3px, -2px); }
+  80%  { transform: translate(3px, 1px); }
+  90%  { transform: translate(-1px, -1px); }
+}
+
+/* Tray slot trash fade-out animation */
+.piece-slot.poofing {
+  animation: slotPoof 0.45s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes slotPoof {
+  0%   { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); }
+  40%  { transform: scale(1.25) rotate(-6deg); opacity: 1; filter: brightness(1.8) hue-rotate(20deg); }
+  100% { transform: scale(0.1) rotate(40deg); opacity: 0; filter: blur(4px); }
+}
+
+/* Tray slot swap-out / swap-in animations */
+.piece-slot.swap-out {
+  animation: slotSwapOut 0.35s ease-in forwards;
+  pointer-events: none;
+}
+@keyframes slotSwapOut {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(80px) rotate(-180deg); opacity: 0; }
+}
+.piece-slot.swap-in {
+  animation: slotSwapIn 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes slotSwapIn {
+  0%   { transform: translateY(-80px) rotate(180deg) scale(0.4); opacity: 0; }
+  100% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
 }
 
 /* ===== HAMMER MODE INDICATOR ===== */
