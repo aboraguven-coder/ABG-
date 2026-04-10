@@ -2,7 +2,7 @@
 // NumDrop — Service Worker (offline support)
 // =============================================
 
-const CACHE_NAME = 'numdrop-v4';
+const CACHE_NAME = 'numdrop-v5';
 const ASSETS = [
   '/',
   '/index.html',

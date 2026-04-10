@@ -1143,6 +1143,72 @@ body.hammer-active #boardCanvas {
   40%      { box-shadow: 0 0 30px rgba(34, 211, 238, 0.9); transform: scale(1.04); }
 }
 
+/* Store section headers */
+.store-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text2);
+  padding: 10px 0 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+/* Gold pack cards */
+.gold-pack {
+  position: relative;
+  border-color: rgba(250, 204, 21, 0.35);
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.08), rgba(251, 146, 60, 0.08));
+}
+.gold-pack.best-value {
+  border-color: rgba(250, 204, 21, 0.7);
+  box-shadow: 0 0 20px rgba(250, 204, 21, 0.25);
+}
+.gp-coins {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gp-coins .coin-icon {
+  width: 28px; height: 28px;
+}
+.gp-amount {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+}
+
+/* Best value badge */
+.best-badge {
+  position: absolute;
+  top: -6px; left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--neon-yellow), var(--neon-orange));
+  color: #2a1600;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  padding: 2px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(250, 204, 21, 0.5);
+  white-space: nowrap;
+}
+
+/* Real money button (distinct from gold-spend button) */
+.sc-buy-money {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  color: #052e16;
+  font-size: 14px;
+  font-weight: 900;
+  padding: 9px 16px;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(74, 222, 128, 0.35);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+.sc-buy-money:active { transform: scale(0.94); }
+
 /* ===== SETTINGS ===== */
 .settings-list {
   display: flex;

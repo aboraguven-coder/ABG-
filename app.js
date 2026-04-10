@@ -24,8 +24,13 @@
   // Points required to fill the skill-progress bar (bigger = rarer drops)
   const SCORE_PER_REWARD = 2500;
 
-  // Gold earned: 1 per this many points of score
-  const GOLD_PER_POINT = 20;
+  // Gold packs available for real-money purchase
+  const GOLD_PACKS = [
+    { id: 'pack_small',  gold: 500,   price: '$0.99',  label: 'Starter Pack' },
+    { id: 'pack_medium', gold: 1500,  price: '$2.99',  label: 'Value Pack',  best: true },
+    { id: 'pack_large',  gold: 5000,  price: '$9.99',  label: 'Pro Pack' },
+    { id: 'pack_mega',   gold: 12000, price: '$19.99', label: 'Mega Pack' },
+  ];
 
   // Weighted probabilities for skill rewards
   const REWARD_WEIGHTS = [
@@ -1435,15 +1440,7 @@
 
   function advanceProgress(points) {
     if (points <= 0) return;
-
-    // Earn gold from score gained
-    const goldGained = Math.floor(points / GOLD_PER_POINT);
-    if (goldGained > 0) {
-      gold += goldGained;
-      localStorage.setItem(GOLD_KEY, gold);
-      updateGoldDisplays(true);
-    }
-
+    // Gold is only earned via real-money purchases — no score-to-gold here.
     skillProgress += points;
     let awarded = 0;
     while (skillProgress >= SCORE_PER_REWARD && awarded < 3) {
@@ -1692,6 +1689,49 @@
     const list = $('storeList');
     list.innerHTML = '';
     updateGoldDisplays(false);
+
+    // --- Section 1: Buy Gold (real money) ---
+    const goldHeader = document.createElement('div');
+    goldHeader.className = 'store-section-title';
+    goldHeader.textContent = 'Buy Gold';
+    list.appendChild(goldHeader);
+
+    GOLD_PACKS.forEach(pack => {
+      const card = document.createElement('div');
+      card.className = 'store-card gold-pack' + (pack.best ? ' best-value' : '');
+      card.innerHTML = `
+        <div class="sc-icon gp-coins">
+          <span class="coin-icon"></span>
+          <span class="gp-amount">${pack.gold.toLocaleString()}</span>
+        </div>
+        <div class="sc-info">
+          <div class="sc-name">${pack.label}</div>
+          <div class="sc-desc">${pack.gold.toLocaleString()} gold coins</div>
+        </div>
+        <button class="sc-buy sc-buy-money" data-pack="${pack.id}">
+          ${pack.price}
+        </button>
+      `;
+      if (pack.best) {
+        const badge = document.createElement('span');
+        badge.className = 'best-badge';
+        badge.textContent = 'BEST VALUE';
+        card.appendChild(badge);
+      }
+      list.appendChild(card);
+    });
+
+    // Wire gold pack buy buttons
+    list.querySelectorAll('[data-pack]').forEach(btn => {
+      btn.onclick = () => purchaseGoldPack(btn.getAttribute('data-pack'));
+    });
+
+    // --- Section 2: Buy Skills (with gold) ---
+    const skillHeader = document.createElement('div');
+    skillHeader.className = 'store-section-title';
+    skillHeader.textContent = 'Buy Skills';
+    list.appendChild(skillHeader);
+
     STORE_ITEMS.forEach(item => {
       const card = document.createElement('div');
       card.className = 'store-card' + (item.rare ? ' rare' : '');
@@ -1710,11 +1750,36 @@
       `;
       list.appendChild(card);
     });
-    // Wire buy buttons
+    // Wire skill buy buttons
     list.querySelectorAll('[data-buy]').forEach(btn => {
       btn.onclick = () => buySkill(btn.getAttribute('data-buy'));
     });
   }
+
+  // Mock In-App Purchase flow — replaced with real StoreKit/Google Play in production
+  function purchaseGoldPack(packId) {
+    const pack = GOLD_PACKS.find(p => p.id === packId);
+    if (!pack) return;
+
+    // Show purchase confirmation modal
+    const confirmed = confirm(
+      `Purchase ${pack.label}?\n\n` +
+      `${pack.gold.toLocaleString()} Gold for ${pack.price}\n\n` +
+      `(Demo mode — in the App Store version this opens\nApple/Google payment. Gold will be granted now.)`
+    );
+    if (!confirmed) return;
+
+    // Grant gold
+    gold += pack.gold;
+    localStorage.setItem(GOLD_KEY, gold);
+    haptic(40);
+    sfxBigCrash();
+    updateGoldDisplays(true);
+    showPopup('+' + pack.gold.toLocaleString() + ' Gold!', 'merge-pop');
+    renderStore();
+    updateTitleScreen();
+  }
+
   function buySkill(name) {
     const item = STORE_ITEMS.find(i => i.name === name);
     if (!item || gold < item.price) return;
